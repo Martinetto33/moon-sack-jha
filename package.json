@@ -8,7 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "cesium": "^1.146.0",
+    "cesium": "^1.147.0",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0"
