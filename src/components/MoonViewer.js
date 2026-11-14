@@ -23,9 +23,21 @@ export default function MoonViewer() {
       if (disposed) return;
       cesiumRef.current = Cesium;
 
+      // The Moon is the globe, so Cesium's own camera controls navigate it.
+      // Lighting and the Sun are computed in the Moon-fixed frame.
+      Cesium.Ellipsoid.default = Cesium.Ellipsoid.MOON;
+      Cesium.CelestialFrameTransforms.computeIcrfToCentralBodyFixedMatrix = (
+        date,
+        result,
+      ) => icrfToMoonFixed(Cesium, date, result);
+
       const viewer = new Cesium.Viewer(hostRef.current, {
-        baseLayer: false, // no Earth imagery: no Ion token required
-        globe: false, // we draw our own Earth sphere below
+        globe: new Cesium.Globe(Cesium.Ellipsoid.MOON),
+        baseLayer: Cesium.ImageryLayer.fromProviderAsync(
+          Cesium.SingleTileImageryProvider.fromUrl(`${BASE}/textures/moon.jpg`),
+        ),
+        // Cesium only adds the star background by default for the Earth.
+        skyBox: Cesium.SkyBox.createEarthSkyBox(),
         baseLayerPicker: false,
         animation: false,
         timeline: false,
@@ -39,81 +51,45 @@ export default function MoonViewer() {
       });
       viewerRef.current = viewer;
 
-      viewer.scene.screenSpaceCameraController.dampingEnabled = true;
-      viewer.scene.screenSpaceCameraController.maximumZoomVelocity = 0.1;
-      viewer.scene.screenSpaceCameraController.zoomSensitivity = 0.01;
-
-      const zoomCameraController = new Cesium.ScreenSpaceZoomCameraController();
-      zoomCameraController.pickWorldPosition = function (
-        scene,
-        windowPosition,
-        result,
-      ) {
-        // Pick the world position from the depth buffer
-        return scene.pickPosition(windowPosition, result);
-      };
-      viewer.addController(zoomCameraController);
-
       viewer.scene.backgroundColor = Cesium.Color.BLACK;
-      viewer.scene.moon.show = false; // hide the built-in low-res Moon
-
-      viewer.entities.add({
-        name: "Moon Surface",
-        position: new Cesium.CallbackProperty(
-          () =>
-            getMoonPosition(Cesium, viewer.clock.currentTime) ??
-            Cesium.Cartesian3.ZERO,
-          false,
-        ),
-        ellipsoid: {
-          radii: new Cesium.Cartesian3(MOON_RADIUS, MOON_RADIUS, MOON_RADIUS),
-          material: new Cesium.ImageMaterialProperty({
-            image: `${BASE}/textures/moon.jpg`,
-            transparent: false,
-          }),
-        },
-      });
+      viewer.scene.globe.enableLighting = true;
+      viewer.scene.globe.showGroundAtmosphere = false;
 
       // Simulation clock: start at "now" and run in real time.
       viewer.clock.currentTime = Cesium.JulianDate.now();
       viewer.clock.multiplier = 1;
       viewer.clock.shouldAnimate = true;
 
-      // Simple Earth at the origin of the Earth-fixed frame.
-      viewer.entities.add({
-        name: "Earth",
-        position: Cesium.Cartesian3.ZERO,
-        ellipsoid: {
-          radii: new Cesium.Cartesian3(
-            EARTH_RADIUS,
-            EARTH_RADIUS,
-            EARTH_RADIUS,
-          ),
-          material: new Cesium.ImageMaterialProperty({
-            image: `${BASE}/textures/earth-texture.jpg`,
-            transparent: false,
-          }),
-        },
+      // Earth orbiting the Moon, with its real orientation. It is a Primitive
+      // moved through its modelMatrix: a moving ellipsoid entity renders white
+      // in Cesium 1.147, because its image material is recreated every frame.
+      const earthAppearance = new Cesium.MaterialAppearance({
+        material: Cesium.Material.fromType("Image", {
+          image: `${BASE}/textures/earth-texture.jpg`,
+        }),
+        closed: true,
       });
-
-      // Moon label that follows the computed Moon position.
-      viewer.entities.add({
-        name: "Moon",
-        position: new Cesium.CallbackProperty(
-          () =>
-            getMoonPosition(Cesium, viewer.clock.currentTime) ??
-            Cesium.Cartesian3.ZERO,
-          false,
-        ),
-        point: { pixelSize: 6, color: Cesium.Color.WHITE },
-        label: {
-          text: "Moon",
-          font: "14px sans-serif",
-          pixelOffset: new Cesium.Cartesian2(0, -24),
-          fillColor: Cesium.Color.WHITE,
-          showBackground: true,
-          backgroundColor: Cesium.Color.fromAlpha(Cesium.Color.BLACK, 0.5),
-        },
+      const earth = viewer.scene.primitives.add(
+        new Cesium.Primitive({
+          geometryInstances: new Cesium.GeometryInstance({
+            geometry: new Cesium.EllipsoidGeometry({
+              radii: new Cesium.Cartesian3(
+                EARTH_RADIUS,
+                EARTH_RADIUS,
+                EARTH_RADIUS,
+              ),
+              vertexFormat: earthAppearance.vertexFormat,
+            }),
+          }),
+          appearance: earthAppearance,
+        }),
+      );
+      viewer.scene.preUpdate.addEventListener((_, time) => {
+        earth.modelMatrix = Cesium.Matrix4.fromRotationTranslation(
+          getEarthOrientation(Cesium, time),
+          getEarthPosition(Cesium, time),
+          earth.modelMatrix,
+        );
       });
 
       // Start with the Earth–Moon system in view.
@@ -198,84 +174,98 @@ export default function MoonViewer() {
   );
 }
 
-/** Moon position in the Earth-fixed frame (meters), or undefined if unavailable. */
-function getMoonPosition(Cesium, time) {
-  const icrf =
+/** Rotation from ICRF to the Moon-fixed frame (IAU model). */
+function icrfToMoonFixed(Cesium, time, result = new Cesium.Matrix3()) {
+  // Transforms.computeIcrfToMoonFixedMatrix (Cesium 1.147) flips the lunar
+  // pole; IauOrientationAxes, which orients Cesium's own Moon, is correct.
+  // shortcut: IauOrientationAxes is marked private in Cesium; if it is removed, compute the IAU rotation here.
+  return new Cesium.IauOrientationAxes().evaluate(time, result);
+}
+
+/** Earth's centre in the Moon-fixed frame (meters). */
+function getEarthPosition(Cesium, time) {
+  const moon =
     Cesium.Simon1994PlanetaryPositions.computeMoonPositionInEarthInertialFrame(
       time,
       new Cesium.Cartesian3(),
     );
-  const rotation = Cesium.Transforms.computeIcrfToFixedMatrix(
-    time,
-    new Cesium.Matrix3(),
-  );
-  if (!rotation) return undefined;
+  const toMoonFixed = icrfToMoonFixed(Cesium, time);
   return Cesium.Matrix3.multiplyByVector(
-    rotation,
-    icrf,
+    toMoonFixed,
+    Cesium.Cartesian3.negate(moon, moon),
     new Cesium.Cartesian3(),
   );
 }
 
+/** Rotation from the Earth-fixed to the Moon-fixed frame. */
+function getEarthOrientation(Cesium, time) {
+  // Falls back to an approximation until Earth orientation data has loaded.
+  const toEarthFixed =
+    Cesium.Transforms.computeIcrfToFixedMatrix(time) ??
+    Cesium.Transforms.computeTemeToPseudoFixedMatrix(time);
+  const toMoonFixed = icrfToMoonFixed(Cesium, time);
+  return Cesium.Matrix3.multiply(
+    toMoonFixed,
+    Cesium.Matrix3.transpose(toEarthFixed, toEarthFixed),
+    toMoonFixed,
+  );
+}
+
 function flyToEarthMoon(Cesium, viewer, duration) {
-  const moon = getMoonPosition(Cesium, viewer.clock.currentTime);
-  if (!moon) return;
   const sphere = Cesium.BoundingSphere.fromPoints([
     Cesium.Cartesian3.ZERO,
-    moon,
+    getEarthPosition(Cesium, viewer.clock.currentTime),
   ]);
   viewer.camera.flyToBoundingSphere(sphere, { duration });
 }
 
 /**
- * @param {number} distanceFactor  multiples of the Moon's radius from its centre
+ * Looks at the Moon from the Earth side, or from the Sun side.
+ * @param {number} distanceFactor  a sphere this many Moon radii wide fills the view
  * @param {boolean} sunFacing      if true, place the camera on the Sun side
  */
 function flyToMoon(Cesium, viewer, distanceFactor, sunFacing = false) {
-  const moon = getMoonPosition(Cesium, viewer.clock.currentTime);
-  if (!moon) return;
+  const time = viewer.clock.currentTime;
+  const from = Cesium.Cartesian3.normalize(
+    sunFacing ? getSunPosition(Cesium, time) : getEarthPosition(Cesium, time),
+    new Cesium.Cartesian3(),
+  );
+  // Same framing as flyToBoundingSphere: fit the narrower field of view.
+  const { fovy, aspectRatio } = viewer.camera.frustum;
+  const distance =
+    (MOON_RADIUS * distanceFactor) /
+    (Math.tan(fovy / 2) * Math.min(1, aspectRatio));
 
-  const sphere = new Cesium.BoundingSphere(moon, MOON_RADIUS * distanceFactor);
-  viewer.camera.flyToBoundingSphere(sphere, { duration: 2 });
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.multiplyByScalar(
+      from,
+      distance,
+      new Cesium.Cartesian3(),
+    ),
+    orientation: {
+      direction: Cesium.Cartesian3.negate(from, new Cesium.Cartesian3()),
+      up: Cesium.Cartesian3.UNIT_Z,
+    },
+    duration: 2,
+  });
+}
 
-  if (sunFacing) {
-    // Rotate the view toward the Sun after the fly-to completes.
-    setTimeout(() => {
-      const sun =
-        Cesium.Simon1994PlanetaryPositions.computeSunPositionInEarthInertialFrame(
-          viewer.clock.currentTime,
-          new Cesium.Cartesian3(),
-        );
-      const rot = Cesium.Transforms.computeIcrfToFixedMatrix(
-        viewer.clock.currentTime,
-        new Cesium.Matrix3(),
-      );
-      if (!rot) return;
-      const sunFixed = Cesium.Matrix3.multiplyByVector(
-        rot,
-        sun,
-        new Cesium.Cartesian3(),
-      );
-      const toMoon = Cesium.Cartesian3.normalize(
-        Cesium.Cartesian3.subtract(moon, sunFixed, new Cesium.Cartesian3()),
-        new Cesium.Cartesian3(),
-      );
-      const sunSideCamera = Cesium.Cartesian3.add(
-        moon,
-        Cesium.Cartesian3.multiplyByScalar(
-          toMoon,
-          -MOON_RADIUS * distanceFactor,
-          new Cesium.Cartesian3(),
-        ),
-        new Cesium.Cartesian3(),
-      );
-      viewer.camera.setView({
-        destination: sunSideCamera,
-        orientation: {
-          direction: Cesium.Cartesian3.negate(toMoon, new Cesium.Cartesian3()),
-          up: Cesium.Cartesian3.UNIT_Z,
-        },
-      });
-    }, 2100);
-  }
+/** Sun's centre in the Moon-fixed frame (meters). */
+function getSunPosition(Cesium, time) {
+  const sun =
+    Cesium.Simon1994PlanetaryPositions.computeSunPositionInEarthInertialFrame(
+      time,
+      new Cesium.Cartesian3(),
+    );
+  const moon =
+    Cesium.Simon1994PlanetaryPositions.computeMoonPositionInEarthInertialFrame(
+      time,
+      new Cesium.Cartesian3(),
+    );
+  const toMoonFixed = icrfToMoonFixed(Cesium, time);
+  return Cesium.Matrix3.multiplyByVector(
+    toMoonFixed,
+    Cesium.Cartesian3.subtract(sun, moon, sun),
+    sun,
+  );
 }
