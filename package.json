@@ -2,9 +2,12 @@
   "name": "moon-sack-jha",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "node scripts/copy-cesium.mjs && next dev",
     "build": "node scripts/copy-cesium.mjs && next build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "start": "next start"
   },
   "dependencies": {
@@ -12,5 +15,8 @@
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.12"
   }
 }
