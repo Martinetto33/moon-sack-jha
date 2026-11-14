@@ -41,7 +41,7 @@ yarn-error.log*
 /out/
 
 # cesium assets, copied from node_modules by scripts/copy-cesium.mjs on dev/build
-/public/cesium/
+/public/cesium/*
 
 # production
 /build
