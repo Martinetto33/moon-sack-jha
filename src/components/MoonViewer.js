@@ -55,7 +55,24 @@ export default function MoonViewer() {
       viewer.addController(zoomCameraController);
 
       viewer.scene.backgroundColor = Cesium.Color.BLACK;
-      viewer.scene.moon.show = true; // Cesium's built-in Moon, lit by the Sun
+      viewer.scene.moon.show = false; // hide the built-in low-res Moon
+
+      viewer.entities.add({
+        name: "Moon Surface",
+        position: new Cesium.CallbackProperty(
+          () =>
+            getMoonPosition(Cesium, viewer.clock.currentTime) ??
+            Cesium.Cartesian3.ZERO,
+          false,
+        ),
+        ellipsoid: {
+          radii: new Cesium.Cartesian3(MOON_RADIUS, MOON_RADIUS, MOON_RADIUS),
+          material: new Cesium.ImageMaterialProperty({
+            image: `${BASE}/textures/moon-texture-poor.jpg`,
+            transparent: false,
+          }),
+        },
+      });
 
       // Simulation clock: start at "now" and run in real time.
       viewer.clock.currentTime = Cesium.JulianDate.now();
@@ -72,7 +89,10 @@ export default function MoonViewer() {
             EARTH_RADIUS,
             EARTH_RADIUS,
           ),
-          material: Cesium.Color.fromCssColorString("#2b6cb0"),
+          material: new Cesium.ImageMaterialProperty({
+            image: `${BASE}/textures/earth-texture.jpg`,
+            transparent: false,
+          }),
         },
       });
 
