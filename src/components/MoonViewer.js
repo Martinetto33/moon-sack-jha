@@ -68,7 +68,7 @@ export default function MoonViewer() {
         ellipsoid: {
           radii: new Cesium.Cartesian3(MOON_RADIUS, MOON_RADIUS, MOON_RADIUS),
           material: new Cesium.ImageMaterialProperty({
-            image: `${BASE}/textures/moon-texture-poor.jpg`,
+            image: `${BASE}/textures/moon.jpg`,
             transparent: false,
           }),
         },
