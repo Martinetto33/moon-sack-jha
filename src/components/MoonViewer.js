@@ -5,6 +5,10 @@ import { useEffect, useRef, useState } from "react";
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const MOON_RADIUS = 1737400; // meters
 const EARTH_RADIUS = 6371000; // meters
+// NASA Moon Trek services, the same ones its own 3D globe uses.
+const MOON_TREK_WAC_MOSAIC =
+  "https://trek.nasa.gov/tiles/Moon/EQ/LRO_WAC_Mosaic_Global_303ppd_v02/1.0.0/{Style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.jpg";
+const MOON_TREK_TERRAIN = "https://marshub.s3.amazonaws.com/moon_v14/";
 
 export default function MoonViewer() {
   const hostRef = useRef(null);
@@ -33,6 +37,13 @@ export default function MoonViewer() {
 
       const viewer = new Cesium.Viewer(hostRef.current, {
         globe: new Cesium.Globe(Cesium.Ellipsoid.MOON),
+        // Relief from LOLA elevation data. No vertex normals: layer.json lists
+        // them but the tiles have none, and requesting them breaks sunlight.
+        terrain: new Cesium.Terrain(
+          Cesium.CesiumTerrainProvider.fromUrl(MOON_TREK_TERRAIN),
+        ),
+        // Low-res local texture under the WAC tiles: shown while they load
+        // or if Moon Trek is unreachable.
         baseLayer: Cesium.ImageryLayer.fromProviderAsync(
           Cesium.SingleTileImageryProvider.fromUrl(`${BASE}/textures/moon.jpg`),
         ),
@@ -50,6 +61,19 @@ export default function MoonViewer() {
         selectionIndicator: false,
       });
       viewerRef.current = viewer;
+
+      // LROC WAC global mosaic, ~100 m/pixel (same basemap as QuickMap).
+      viewer.imageryLayers.addImageryProvider(
+        new Cesium.WebMapTileServiceImageryProvider({
+          url: MOON_TREK_WAC_MOSAIC,
+          layer: "LRO_WAC_Mosaic_Global_303ppd_v02",
+          style: "default",
+          tileMatrixSetID: "default028mm",
+          tilingScheme: new Cesium.GeographicTilingScheme(),
+          maximumLevel: 8,
+          credit: "LROC WAC mosaic: NASA/GSFC/Arizona State University, via NASA Moon Trek",
+        }),
+      );
 
       viewer.scene.backgroundColor = Cesium.Color.BLACK;
       viewer.scene.globe.enableLighting = true;
