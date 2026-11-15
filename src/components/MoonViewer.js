@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "primereact/button";
+import { parseLandingSites } from "./landingSites";
 import SidePanel from "./SidePanel";
 import "../resources/css/main.css";
 
@@ -22,6 +23,9 @@ export default function MoonViewer() {
   const [status, setStatus] = useState("Initializing Cesium…");
   const [paused, setPaused] = useState(false);
   const [onSurface, setOnSurface] = useState(false);
+  // Every site from the loaded GeoJSON files (see parseLandingSites).
+  const [landingSites, setLandingSites] = useState([]);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     let disposed = false;
@@ -224,6 +228,24 @@ export default function MoonViewer() {
     });
   };
 
+  const addLandingSites = async (event) => {
+    const files = [...event.target.files];
+    event.target.value = ""; // so the same file can be picked again
+    for (const file of files) {
+      try {
+        const sites = parseLandingSites(await file.text(), file.name);
+        // Adding a file again replaces its sites.
+        setLandingSites((current) => [
+          ...current.filter((site) => site.source !== file.name),
+          ...sites,
+        ]);
+        setStatus(`Added ${sites.length} landing sites from ${file.name}.`);
+      } catch (err) {
+        setStatus(`Could not read ${file.name}: ${err.message}.`);
+      }
+    }
+  };
+
   // The presets leave the surface.
   const goTo = (fly) => {
     withViewer(fly);
@@ -243,8 +265,60 @@ export default function MoonViewer() {
     <>
       <div ref={hostRef} className="cesium-host" />
 
-      <div className="controls">
-        <SidePanel className="panel"></SidePanel>
+      <div className="overlay">
+        <div className="controls">
+          <SidePanel className="panel"></SidePanel>
+          <h1>🌕 Moon</h1>
+          <p>Real-time lunar position computed with Cesium.</p>
+
+          <div className="row">
+            <button onClick={togglePlay}>
+              {paused ? "▶ Play" : "⏸ Pause"}
+            </button>
+            <button
+              onClick={() =>
+                withViewer((C, v) => (v.clock.currentTime = C.JulianDate.now()))
+              }
+            >
+              ⟲ Now
+            </button>
+          </div>
+
+          <div className="row">
+            <button onClick={() => setSpeed(1)}>1×</button>
+            <button onClick={() => setSpeed(3600)}>1 h/s</button>
+            <button onClick={() => setSpeed(86400)}>1 d/s</button>
+          </div>
+
+          <button onClick={() => fileInputRef.current.click()}>
+            ➕ Add landing sites
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".geojson,.json,application/geo+json,application/json"
+            multiple
+            hidden
+            onChange={addLandingSites}
+          />
+        </div>
+
+        <nav className="nav">
+          <button onClick={() => goTo(flyToSystem)}>
+            ☀️ Sun, Earth &amp; Moon
+          </button>
+          <button onClick={() => goTo(flyToMoon)}>🌕 Moon close-up</button>
+          {onSurface && (
+            <>
+              <button onClick={() => look(getEarthPosition, "Earth")}>
+                🌍 Look at Earth
+              </button>
+              <button onClick={() => look(getSunPosition, "Sun")}>
+                ☀️ Look at Sun
+              </button>
+            </>
+          )}
+        </nav>
       </div>
     </>
   );
