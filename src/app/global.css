@@ -18,11 +18,49 @@ body {
   inset: 0;
 }
 
-.controls {
+/* Panel on the left, navigation bar centred; stacked on narrow screens. */
+.overlay {
   position: absolute;
   top: 16px;
   left: 16px;
+  right: 16px;
   z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  pointer-events: none; /* the Moon stays draggable between the boxes */
+}
+
+.overlay > * {
+  pointer-events: auto;
+}
+
+@media (max-width: 900px) {
+  .overlay {
+    grid-template-columns: 1fr;
+  }
+
+  .nav {
+    order: -1;
+  }
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(10, 12, 20, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #e6e6e6;
+  backdrop-filter: blur(6px);
+}
+
+.controls {
+  justify-self: start;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -46,7 +84,8 @@ body {
   opacity: 0.75;
 }
 
-.controls button:not(.p-button) {
+.controls button:not(.p-button),
+.nav button:not(.p-button) {
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
@@ -57,7 +96,8 @@ body {
   cursor: pointer;
 }
 
-.controls button:not(.p-button):hover {
+.controls button:not(.p-button):hover,
+.nav button:not(.p-button):hover {
   background: rgba(255, 255, 255, 0.14);
 }
 
