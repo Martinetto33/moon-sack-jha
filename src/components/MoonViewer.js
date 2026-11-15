@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "primereact/button";
+import { ClockRange } from "cesium";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const MOON_RADIUS = 1737400; // meters
@@ -51,7 +52,7 @@ export default function MoonViewer() {
         // Cesium only adds the star background by default for the Earth.
         skyBox: Cesium.SkyBox.createEarthSkyBox(),
         baseLayerPicker: false,
-        animation: false,
+        animation: true,
         timeline: true,
         geocoder: false,
         homeButton: false,
@@ -84,6 +85,7 @@ export default function MoonViewer() {
       viewer.clock.currentTime = Cesium.JulianDate.now();
       viewer.clock.multiplier = 1;
       viewer.clock.shouldAnimate = true;
+      viewer.clock.clockRange = ClockRange.UNBOUNDED;
 
       // Earth orbiting the Moon, with its real orientation, and a stand-in
       // for the Moon drawn around the globe when it would look too small.
