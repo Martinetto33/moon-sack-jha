@@ -68,7 +68,7 @@ export default function SidePanel({
 
   const focusSite = (site) => {
     const [lon, lat] = representativePoint(site.geometry.coordinates);
-    onFocusSite(lon, lat);
+    onFocusSite(lon, lat, site.name);
     setStatus(`Flying to ${site.name}.`);
   };
 

@@ -1,9 +1,10 @@
 "use client";
 import * as Cesium from "cesium";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SummaryPanel from "./SummaryPanel";
-import { MoonDataDTO, TARGET_PLANETS } from "../app/api/MoonData.js";
+import { TARGET_PLANETS } from "../app/api/MoonData.js";
+import { getForLatAndLong } from "../app/api/HorizonService.js";
 import { SummaryCreator } from "../app/api/Summary.js";
 import { parseLandingSites } from "./landingSites";
 import SidePanel from "./SidePanel";
@@ -19,6 +20,10 @@ const MOON_TREK_WAC_MOSAIC =
 const MOON_TREK_TERRAIN = "https://marshub.s3.amazonaws.com/moon_v14/";
 const HELP =
   "Drag to rotate · scroll to zoom · right-drag to tilt · double-click the Moon to stand on it";
+const WANTED_TARGETS = {
+  earth: { elevation: 15, azimuth: 180 },
+  sun: { elevation: 45, azimuth: 0 },
+};
 
 export default function MoonViewer() {
   const hostRef = useRef(null);
@@ -29,11 +34,16 @@ export default function MoonViewer() {
   const [onSurface, setOnSurface] = useState(false);
   const [viewer, setViewer] = useState(null);
   const [simulationSites, setSimulationSites] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [summarySiteName, setSummarySiteName] = useState("");
+  const [summaryStatus, setSummaryStatus] = useState({
+    kind: "idle",
+    message: "Select a landing site to load its summary.",
+  });
+  const summaryRequestIdRef = useRef(0);
   // Every site from the loaded GeoJSON files (see parseLandingSites).
   const [landingSites, setLandingSites] = useState([]);
   const fileInputRef = useRef(null);
-  const summary = useMemo(createMockSummary, []);
-
   useEffect(() => {
     let disposed = false;
 
@@ -210,6 +220,7 @@ export default function MoonViewer() {
 
     return () => {
       disposed = true;
+      summaryRequestIdRef.current++;
       viewerRef.current?.destroy();
       viewerRef.current = null;
       setViewer(null);
@@ -251,20 +262,91 @@ export default function MoonViewer() {
       setStatus(visible ? HELP : `The ${name} is below the horizon from here.`);
     });
   };
-  const focusOnSite = (lon, lat) => {
-    const cartographic = Cesium.Cartographic.fromDegrees(lon, lat, 0);
-    const worldPosition =
-      Cesium.Ellipsoid.MOON.cartographicToCartesian(cartographic);
+  const loadSummaryForSite = async (longitude, latitude, siteName) => {
+    const requestId = ++summaryRequestIdRef.current;
+    const activeViewer = viewerRef.current;
+    const Cesium = cesiumRef.current;
+    const selectedTime =
+      activeViewer && Cesium
+        ? Cesium.JulianDate.toDate(activeViewer.clock.currentTime)
+        : new Date();
 
-    setStanding(viewer, false); // re-enable camera controls if the user is standing
+    setSummary(null);
+    setSummarySiteName(siteName);
+    setSummaryStatus({
+      kind: "loading",
+      message: `Loading summary for ${siteName}…`,
+    });
 
-    viewer.camera.flyToBoundingSphere(
-      new Cesium.BoundingSphere(worldPosition, 0),
-      {
-        duration: 3.5,
-        offset: new Cesium.HeadingPitchRange(0, -Math.PI / 3, 50000),
-      },
-    );
+    try {
+      const [moonToEarthDTOs, moonToSunDTOs] = await Promise.all([
+        getForLatAndLong(
+          TARGET_PLANETS.EARTH,
+          latitude,
+          longitude,
+          selectedTime,
+        ),
+        getForLatAndLong(
+          TARGET_PLANETS.SUN,
+          latitude,
+          longitude,
+          selectedTime,
+        ),
+      ]);
+
+      if (requestId !== summaryRequestIdRef.current) return;
+      const firstEarthSample = moonToEarthDTOs[0];
+      const lastEarthSample = moonToEarthDTOs.at(-1);
+      if (!firstEarthSample || !lastEarthSample || moonToSunDTOs.length === 0) {
+        throw new Error("Horizons returned no data for this site.");
+      }
+
+      const creator = new SummaryCreator({
+        latitude,
+        longitude,
+        startTime: firstEarthSample.time,
+        endTime: lastEarthSample.time,
+        moonToEarthDTOs,
+        moonToSunDTOs,
+        wantedTargets: WANTED_TARGETS,
+      });
+      setSummary(creator.selectTime(selectedTime));
+      setSummaryStatus({ kind: "idle", message: "" });
+    } catch (error) {
+      if (requestId !== summaryRequestIdRef.current) return;
+      console.error(`Could not load summary for ${siteName}.`, error);
+      setSummaryStatus({
+        kind: "error",
+        message: `Could not load ${siteName}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+    }
+  };
+
+  const focusOnSite = (longitude, latitude, siteName) => {
+    const activeViewer = viewerRef.current;
+    if (activeViewer) {
+      const cartographic = Cesium.Cartographic.fromDegrees(
+        longitude,
+        latitude,
+        0,
+      );
+      const worldPosition =
+        Cesium.Ellipsoid.MOON.cartographicToCartesian(cartographic);
+
+      setStanding(activeViewer, false);
+      setOnSurface(false);
+      activeViewer.camera.flyToBoundingSphere(
+        new Cesium.BoundingSphere(worldPosition, 0),
+        {
+          duration: 3.5,
+          offset: new Cesium.HeadingPitchRange(0, -Math.PI / 3, 50000),
+        },
+      );
+    }
+
+    loadSummaryForSite(longitude, latitude, siteName);
   };
 
   let isSummaryRendered = true; // TODO: toggle based on camera state (set to true when camera is on Moon surface)
@@ -273,7 +355,12 @@ export default function MoonViewer() {
     <>
       <div ref={hostRef} className="cesium-host">
         <div className="cesium-overlay-layer">
-          <SummaryPanel isRendered={isSummaryRendered} summary={summary} />
+          <SummaryPanel
+            isRendered={isSummaryRendered}
+            summary={summary}
+            siteName={summarySiteName}
+            summaryStatus={summaryStatus}
+          />
         </div>
       </div>
       <SimulationSites viewer={viewer} sites={simulationSites} />
@@ -339,79 +426,6 @@ export default function MoonViewer() {
       <div className="status">{status}</div>
     </>
   );
-}
-
-function createMockSummary() {
-  const selectedTime = new Date();
-  const samples = [
-    {
-      hours: -12,
-      earthAzimuth: 20,
-      earthElevation: -25,
-      sunAzimuth: 300,
-      sunElevation: 18,
-    },
-    {
-      hours: -6,
-      earthAzimuth: 80,
-      earthElevation: -8,
-      sunAzimuth: 340,
-      sunElevation: 42,
-    },
-    {
-      hours: 0,
-      earthAzimuth: 145,
-      earthElevation: 12,
-      sunAzimuth: 20,
-      sunElevation: 55,
-    },
-    {
-      hours: 6,
-      earthAzimuth: 220,
-      earthElevation: 24,
-      sunAzimuth: 60,
-      sunElevation: 28,
-    },
-    {
-      hours: 12,
-      earthAzimuth: 300,
-      earthElevation: -15,
-      sunAzimuth: 100,
-      sunElevation: -10,
-    },
-  ];
-  const toMoonData = (target, azimuthKey, elevationKey) =>
-    samples.map(({ hours, ...sample }) => {
-      const time = new Date(selectedTime.getTime() + hours * 60 * 60 * 1000);
-      return new MoonDataDTO(
-        target,
-        time,
-        sample[azimuthKey],
-        sample[elevationKey],
-        false,
-        false,
-      );
-    });
-  const startTime = new Date(selectedTime.getTime() - 12 * 60 * 60 * 1000);
-  const endTime = new Date(selectedTime.getTime() + 12 * 60 * 60 * 1000);
-  const creator = new SummaryCreator({
-    latitude: 0.674,
-    longitude: 23.473,
-    startTime,
-    endTime,
-    moonToEarthDTOs: toMoonData(
-      TARGET_PLANETS.EARTH,
-      "earthAzimuth",
-      "earthElevation",
-    ),
-    moonToSunDTOs: toMoonData(TARGET_PLANETS.SUN, "sunAzimuth", "sunElevation"),
-    wantedTargets: {
-      earth: { elevation: 15, azimuth: 180 },
-      sun: { elevation: 45, azimuth: 0 },
-    },
-  });
-
-  return creator.selectTime(selectedTime);
 }
 
 /** Rotation from ICRF to the Moon-fixed frame (IAU model). */

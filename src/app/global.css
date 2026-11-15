@@ -130,6 +130,20 @@ body {
   font-size: 11px;
 }
 
+.summary-message {
+  margin: 4px 0 0;
+  color: #ccc;
+  font-size: 13px;
+}
+
+.summary-message--loading {
+  color: #ddd;
+}
+
+.summary-message--error {
+  color: #ff9a9a;
+}
+
 .summary-toggle {
   display: grid;
   flex: 0 0 28px;

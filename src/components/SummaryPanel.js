@@ -1,6 +1,11 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
-export default function SummaryPanel({ isRendered, summary }) {
+export default function SummaryPanel({
+  isRendered,
+  summary,
+  siteName,
+  summaryStatus,
+}) {
   const panelRef = useRef(null);
   const dragRef = useRef(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -26,7 +31,7 @@ export default function SummaryPanel({ isRendered, summary }) {
     }
   }, [isMinimized]);
 
-  if (!isRendered || !summary) return null;
+  if (!isRendered) return null;
 
   const startDrag = (event) => {
     if (!event.isPrimary || event.button !== 0 || event.target.closest("button")) {
@@ -83,7 +88,7 @@ export default function SummaryPanel({ isRendered, summary }) {
         onPointerCancel={stopDrag}
       >
         <div className="summary-title">
-          <h2>Site summary</h2>
+          <h2>{siteName ? `${siteName} summary` : "Site summary"}</h2>
           {!isMinimized && (
             <span className="summary-drag-hint">Drag header to move</span>
           )}
@@ -99,7 +104,7 @@ export default function SummaryPanel({ isRendered, summary }) {
         </button>
       </header>
 
-      {!isMinimized && (
+      {!isMinimized && summary && (
         <>
           <div className="summary-overview">
             <span>
@@ -192,6 +197,14 @@ export default function SummaryPanel({ isRendered, summary }) {
             </section>
           </div>
         </>
+      )}
+      {!isMinimized && !summary && (
+        <p
+          className={`summary-message summary-message--${summaryStatus.kind}`}
+          role={summaryStatus.kind === "error" ? "alert" : "status"}
+        >
+          {summaryStatus.message}
+        </p>
       )}
     </section>
   );
