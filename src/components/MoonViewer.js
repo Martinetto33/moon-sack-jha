@@ -4,7 +4,11 @@ import * as Cesium from "cesium";
 import { useEffect, useRef, useState } from "react";
 import SummaryPanel from "./SummaryPanel";
 import { TARGET_PLANETS } from "../app/api/MoonData.js";
-import { getForLatAndLong } from "../app/api/HorizonService.js";
+import {
+  addUtcMonths,
+  getForLatAndLong,
+  TIME_UNITS,
+} from "../app/api/HorizonService.js";
 import { SummaryCreator } from "../app/api/Summary.js";
 import { parseLandingSites } from "./landingSites";
 import SidePanel from "./SidePanel";
@@ -20,9 +24,9 @@ const MOON_TREK_WAC_MOSAIC =
 const MOON_TREK_TERRAIN = "https://marshub.s3.amazonaws.com/moon_v14/";
 const HELP =
   "Drag to rotate · scroll to zoom · right-drag to tilt · double-click the Moon to stand on it";
-const WANTED_TARGETS = {
-  earth: { elevation: 15, azimuth: 180 },
-  sun: { elevation: 45, azimuth: 0 },
+const DEFAULT_WANTED_TARGETS = {
+  earth: { elevation: 0, azimuth: 0 },
+  sun: { elevation: 0, azimuth: 0 },
 };
 
 export default function MoonViewer() {
@@ -34,6 +38,7 @@ export default function MoonViewer() {
   const [viewer, setViewer] = useState(null);
   const [simulationSites, setSimulationSites] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [wantedTargets, setWantedTargets] = useState(DEFAULT_WANTED_TARGETS);
   const [summarySiteName, setSummarySiteName] = useState("");
   const [summaryStatus, setSummaryStatus] = useState({
     kind: "idle",
@@ -267,6 +272,9 @@ export default function MoonViewer() {
       activeViewer && Cesium
         ? Cesium.JulianDate.toDate(activeViewer.clock.currentTime)
         : new Date();
+    const requestStartTime = new Date(selectedTime);
+    requestStartTime.setUTCHours(0, 0, 0, 0);
+    const requestEndTime = addUtcMonths(selectedTime, 2);
 
     setSummary(null);
     setSummarySiteName(siteName);
@@ -276,18 +284,25 @@ export default function MoonViewer() {
     });
 
     try {
+      const summaryWantedTargets = getWantedTargets(wantedTargets);
       const [moonToEarthDTOs, moonToSunDTOs] = await Promise.all([
         getForLatAndLong(
           TARGET_PLANETS.EARTH,
           latitude,
           longitude,
-          selectedTime,
+          requestStartTime,
+          requestEndTime,
+          TIME_UNITS.HOUR,
+          1,
         ),
         getForLatAndLong(
           TARGET_PLANETS.SUN,
           latitude,
           longitude,
-          selectedTime,
+          requestStartTime,
+          requestEndTime,
+          TIME_UNITS.HOUR,
+          1,
         ),
       ]);
 
@@ -305,7 +320,7 @@ export default function MoonViewer() {
         endTime: lastEarthSample.time,
         moonToEarthDTOs,
         moonToSunDTOs,
-        wantedTargets: WANTED_TARGETS,
+        wantedTargets: summaryWantedTargets,
       });
       setSummary(creator.selectTime(selectedTime));
       setSummaryStatus({ kind: "idle", message: "" });
@@ -368,6 +383,8 @@ export default function MoonViewer() {
             <SidePanel
               simulationSites={simulationSites}
               setSimulationSites={setSimulationSites}
+              wantedTargets={wantedTargets}
+              onWantedTargetsChange={setWantedTargets}
               onFocusSite={focusOnSite}
             />
           </div>
@@ -422,6 +439,30 @@ export default function MoonViewer() {
 
       <div className="status">{status}</div>
     </>
+  );
+}
+
+function getWantedTargets(targets) {
+  return Object.fromEntries(
+    Object.entries(targets).map(([name, values]) => {
+      const elevation = Number(values.elevation);
+      const azimuth = Number(values.azimuth);
+      if (
+        values.elevation === "" ||
+        values.azimuth === "" ||
+        !Number.isFinite(elevation) ||
+        elevation < -90 ||
+        elevation > 90 ||
+        !Number.isFinite(azimuth) ||
+        azimuth < 0 ||
+        azimuth > 360
+      ) {
+        throw new RangeError(
+          `${name} elevation must be -90 to 90° and azimuth 0 to 360°.`,
+        );
+      }
+      return [name, { elevation, azimuth }];
+    }),
   );
 }
 

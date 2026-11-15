@@ -62,7 +62,7 @@ export function buildUrlWithTwoMonthFrame(
     );
 }
 
-function addUtcMonths(date, months) {
+export function addUtcMonths(date, months) {
     const result = new Date(date);
     const day = result.getUTCDate();
     result.setUTCDate(1);

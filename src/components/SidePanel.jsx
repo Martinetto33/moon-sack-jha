@@ -7,6 +7,8 @@ const BASE_FILES = ["/sites/landing-sites-A3.geojson"];
 export default function SidePanel({
   simulationSites,
   setSimulationSites,
+  wantedTargets,
+  onWantedTargetsChange,
   onFocusSite,
 }) {
   // Every site from the loaded GeoJSON files.
@@ -93,7 +95,10 @@ export default function SidePanel({
           onChange={addLandingSites}
         />
       </div>
-      <DirectionGrid />
+      <DirectionGrid
+        wantedTargets={wantedTargets}
+        onWantedTargetsChange={onWantedTargetsChange}
+      />
 
       <div
         className="scroll-panel"
@@ -145,10 +150,7 @@ function representativePoint(coordinates) {
   return [lon, lat];
 }
 
-function DirectionRow({ label }) {
-  const [elevation, setElevation] = useState(0);
-  const [azimuth, setAzimuth] = useState(0);
-
+function DirectionRow({ label, target, onChange }) {
   return (
     <>
       <span className="grid-label">{label}</span>
@@ -157,8 +159,13 @@ function DirectionRow({ label }) {
         min={-90}
         max={90}
         step={0.1}
-        value={elevation}
-        onChange={(e) => setElevation(e.target.value)}
+        value={target.elevation}
+        onChange={(e) =>
+          onChange(
+            "elevation",
+            e.target.value === "" ? "" : Number(e.target.value),
+          )
+        }
         aria-label={`${label} elevation`}
       />
       <input
@@ -166,22 +173,39 @@ function DirectionRow({ label }) {
         min={0}
         max={360}
         step={0.1}
-        value={azimuth}
-        onChange={(e) => setAzimuth(e.target.value)}
+        value={target.azimuth}
+        onChange={(e) =>
+          onChange("azimuth", e.target.value === "" ? "" : Number(e.target.value))
+        }
         aria-label={`${label} azimuth`}
       />
     </>
   );
 }
 
-export function DirectionGrid() {
+export function DirectionGrid({ wantedTargets, onWantedTargetsChange }) {
+  const updateTarget = (name, field, value) => {
+    onWantedTargetsChange((current) => ({
+      ...current,
+      [name]: { ...current[name], [field]: value },
+    }));
+  };
+
   return (
     <div className="direction-grid">
       <span />
       <span className="grid-head">Elevation °</span>
       <span className="grid-head">Azimuth °</span>
-      <DirectionRow label="☀️ Sun" />
-      <DirectionRow label="🌍 Earth" />
+      <DirectionRow
+        label="☀️ Sun"
+        target={wantedTargets.sun}
+        onChange={(field, value) => updateTarget("sun", field, value)}
+      />
+      <DirectionRow
+        label="🌍 Earth"
+        target={wantedTargets.earth}
+        onChange={(field, value) => updateTarget("earth", field, value)}
+      />
     </div>
   );
 }

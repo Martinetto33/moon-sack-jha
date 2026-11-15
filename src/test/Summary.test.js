@@ -94,4 +94,31 @@ describe("SummaryCreator", () => {
             "2026-11-15 00:00:00 UTC - 2026-11-15 03:00:00 UTC",
         );
     });
+
+    it("reports query-window duration separately from visibility on the selected day", () => {
+        const earth = [
+            row(TARGET_PLANETS.EARTH, "2026-11-15T00:00:00Z", 0, -10),
+            row(TARGET_PLANETS.EARTH, "2026-11-15T23:00:00Z", 0, -10),
+            row(TARGET_PLANETS.EARTH, "2026-11-16T00:00:00Z", 0, -10),
+            row(TARGET_PLANETS.EARTH, "2026-11-16T02:00:00Z", 0, 10),
+            row(TARGET_PLANETS.EARTH, "2026-11-16T04:00:00Z", 0, -10),
+        ];
+        const creator = new SummaryCreator({
+            latitude: 12.5,
+            longitude: -45.25,
+            startTime: new Date("2026-11-15T00:00:00Z"),
+            endTime: new Date("2026-11-17T00:00:00Z"),
+            moonToEarthDTOs: earth,
+            moonToSunDTOs: [],
+            wantedTargets: {
+                earth: { elevation: 5, azimuth: 0 },
+                sun: { elevation: 5, azimuth: 180 },
+            },
+        });
+
+        const dto = creator.selectTime(new Date("2026-11-15T12:00:00Z"));
+
+        expect(dto.communicationDuration).toBe(2 * 60 * 60 * 1000);
+        expect(dto.communicationTimeWindow).toBe("No visibility");
+    });
 });

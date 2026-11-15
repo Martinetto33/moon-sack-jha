@@ -148,12 +148,12 @@ export default function SummaryPanel({
                   value={formatUtc(summary.earth.closestAzimuthTime)}
                 />
                 <Metric
-                  label="Communication duration"
+                  label="Communication duration (query window)"
                   value={formatDuration(summary.communicationDuration)}
                 />
                 <Metric
                   className="summary-window"
-                  label="Communication window"
+                  label="Communication window (UTC day)"
                   value={summary.communicationTimeWindow}
                 />
               </dl>
@@ -185,12 +185,12 @@ export default function SummaryPanel({
                   value={formatUtc(summary.sun.closestAzimuthTime)}
                 />
                 <Metric
-                  label="Sunlight duration"
+                  label="Sunlight duration (query window)"
                   value={formatDuration(summary.sunlightDuration)}
                 />
                 <Metric
                   className="summary-window"
-                  label="Sunlight window"
+                  label="Sunlight window (UTC day)"
                   value={summary.sunlightTimeWindow}
                 />
               </dl>
