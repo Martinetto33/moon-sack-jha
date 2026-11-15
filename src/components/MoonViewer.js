@@ -335,7 +335,7 @@ export default function MoonViewer() {
           )}
         </nav>
       </div>
-      <DatePicker viewer={viewer} />
+      <DatePicker viewer={viewer}/>
       <div className="status">{status}</div>
     </>
   );

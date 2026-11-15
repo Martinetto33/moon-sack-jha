@@ -22,6 +22,7 @@ export default function TimelineDatePicker({ viewer }) {
       hourFormat="24"
       dateFormat="dd/mm/yy"
       showIcon
+      style={{position: "absolute", bottom: "2"}}
     />
   );
 }
