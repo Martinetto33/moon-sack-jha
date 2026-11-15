@@ -18,6 +18,13 @@ body {
   inset: 0;
 }
 
+.cesium-overlay-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
 /* Panel on the left, navigation bar centred; stacked on narrow screens. */
 .overlay {
   position: absolute;
@@ -73,9 +80,9 @@ body {
   position: absolute;
   bottom: 16px;
   right: 16px;
-  z-index: 10;
+  z-index: 1;
   box-sizing: border-box;
-  width: min(620px, calc(100vw - 32px));
+  width: min(480px, calc(100vw - 32px));
   padding: 12px;
   max-height: calc(100vh - 16px);
   overflow: auto;
@@ -84,6 +91,18 @@ body {
   background: rgba(10, 12, 20, 0.9);
   color: #e6e6e6;
   backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.summary-overlay--minimized {
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 8px 10px;
+}
+
+.summary-overlay--minimized .summary-header {
+  gap: 8px;
+  margin-bottom: 0;
 }
 
 .summary-header {
@@ -137,13 +156,18 @@ body {
   font-size: 12px;
 }
 
-.summary-splitter {
-  border-color: rgba(255, 255, 255, 0.16);
+.summary-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .summary-target {
   min-width: 0;
   padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(5, 7, 13, 0.96);
   overflow: auto;
 }
 
@@ -233,5 +257,17 @@ body {
     right: 12px;
     bottom: 52px;
     width: calc(100vw - 24px);
+    max-height: calc(100vh - 64px);
+  }
+
+  .summary-overlay--minimized {
+    width: max-content;
+    max-width: calc(100vw - 24px);
+  }
+}
+
+@media (max-width: 520px) {
+  .summary-content {
+    grid-template-columns: 1fr;
   }
 }

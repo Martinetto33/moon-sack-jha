@@ -268,7 +268,11 @@ export default function MoonViewer() {
 
   return (
     <>
-      <div ref={hostRef} className="cesium-host" />
+      <div ref={hostRef} className="cesium-host">
+        <div className="cesium-overlay-layer">
+          <SummaryPanel isRendered={isSummaryRendered} summary={summary} />
+        </div>
+      </div>
 
       <div className="overlay">
         <div className="controls">
@@ -328,7 +332,6 @@ export default function MoonViewer() {
 
       <div className="status">{status}</div>
 
-      <SummaryPanel isRendered={isSummaryRendered} summary={summary} />
     </>
   );
 }

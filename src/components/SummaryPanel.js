@@ -1,5 +1,4 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { Splitter, SplitterPanel } from "primereact/splitter";
 
 export default function SummaryPanel({ isRendered, summary }) {
   const panelRef = useRef(null);
@@ -72,7 +71,7 @@ export default function SummaryPanel({ isRendered, summary }) {
   return (
     <section
       ref={panelRef}
-      className="summary-overlay"
+      className={`summary-overlay${isMinimized ? " summary-overlay--minimized" : ""}`}
       aria-label="Lunar site summary"
       style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
     >
@@ -112,8 +111,8 @@ export default function SummaryPanel({ isRendered, summary }) {
             </span>
           </div>
 
-          <Splitter className="summary-splitter" style={{ height: "250px" }}>
-            <SplitterPanel className="summary-target">
+          <div className="summary-content">
+            <section className="summary-target">
               <h3>Earth visibility</h3>
               <dl>
                 <Metric
@@ -148,9 +147,9 @@ export default function SummaryPanel({ isRendered, summary }) {
                   value={summary.communicationTimeWindow}
                 />
               </dl>
-            </SplitterPanel>
+            </section>
 
-            <SplitterPanel className="summary-target">
+            <section className="summary-target">
               <h3>Sunlight</h3>
               <dl>
                 <Metric
@@ -185,8 +184,8 @@ export default function SummaryPanel({ isRendered, summary }) {
                   value={summary.sunlightTimeWindow}
                 />
               </dl>
-            </SplitterPanel>
-          </Splitter>
+            </section>
+          </div>
         </>
       )}
     </section>
