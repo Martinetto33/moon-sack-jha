@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { parseLandingSites } from "./landingSites";
 
 // File in public/resources/ caricati automaticamente all'avvio
-const BASE_FILES = ["/sites/landing-sites-A3.geojson"];
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
+const BASE_FILES = [`${BASE}/sites/landing-sites-A3.geojson`];
 
 export default function SidePanel({
   simulationSites,
