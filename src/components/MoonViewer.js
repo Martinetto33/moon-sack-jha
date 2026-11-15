@@ -9,6 +9,8 @@ const EARTH_RADIUS = 6371000; // meters
 const MOON_TREK_WAC_MOSAIC =
   "https://trek.nasa.gov/tiles/Moon/EQ/LRO_WAC_Mosaic_Global_303ppd_v02/1.0.0/{Style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.jpg";
 const MOON_TREK_TERRAIN = "https://marshub.s3.amazonaws.com/moon_v14/";
+const HELP =
+  "Drag to rotate · scroll to zoom · right-drag to tilt · double-click the Moon to stand on it";
 
 export default function MoonViewer() {
   const hostRef = useRef(null);
@@ -16,6 +18,7 @@ export default function MoonViewer() {
   const cesiumRef = useRef(null);
   const [status, setStatus] = useState("Initializing Cesium…");
   const [paused, setPaused] = useState(false);
+  const [onSurface, setOnSurface] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -34,6 +37,17 @@ export default function MoonViewer() {
         date,
         result,
       ) => icrfToMoonFixed(Cesium, date, result);
+      // Cesium culls what is behind a sphere at the lowest loaded terrain, and
+      // everything when the camera is inside it. Standing in a crater can be
+      // below it, which hid the Earth and the Sun: the ground still hides them.
+      // shortcut: reads Occluder's private _horizonDistance, its "camera inside" flag; recheck on Cesium upgrades.
+      const isVisible = Cesium.Occluder.prototype.isBoundingSphereVisible;
+      Cesium.Occluder.prototype.isBoundingSphereVisible = function (sphere) {
+        return (
+          this._horizonDistance === Number.MAX_VALUE ||
+          isVisible.call(this, sphere)
+        );
+      };
 
       const viewer = new Cesium.Viewer(hostRef.current, {
         globe: new Cesium.Globe(Cesium.Ellipsoid.MOON),
@@ -131,7 +145,9 @@ export default function MoonViewer() {
       input.setInputAction((click) => {
         const ray = viewer.camera.getPickRay(click.position);
         const position = ray && viewer.scene.globe.pick(ray, viewer.scene);
-        if (position) standOn(Cesium, viewer, position);
+        if (position) {
+          standOn(Cesium, viewer, position).then(() => setOnSurface(true));
+        }
       }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
       // While standing, dragging turns the view and keeps the horizon level.
@@ -146,7 +162,6 @@ export default function MoonViewer() {
         if (!dragFrom || !isStanding(viewer)) return;
         const camera = viewer.camera;
         const radiansPerPixel = camera.frustum.fovy / viewer.canvas.clientHeight;
-        const maxPitch = Cesium.Math.toRadians(85);
         camera.setView({
           orientation: {
             heading:
@@ -154,8 +169,8 @@ export default function MoonViewer() {
               (move.endPosition.x - dragFrom.x) * radiansPerPixel,
             pitch: Cesium.Math.clamp(
               camera.pitch + (move.endPosition.y - dragFrom.y) * radiansPerPixel,
-              -maxPitch,
-              maxPitch,
+              -MAX_PITCH,
+              MAX_PITCH,
             ),
             roll: 0,
           },
@@ -165,9 +180,7 @@ export default function MoonViewer() {
 
       // Start with the Sun, the Earth and the Moon in view.
       flyToSystem(Cesium, viewer, 0);
-      setStatus(
-        "Drag to rotate · scroll to zoom · right-drag to tilt · double-click the Moon to stand on it",
-      );
+      setStatus(HELP);
     })().catch((err) => {
       console.error(err);
       setStatus("Failed to load Cesium. Check the console.");
@@ -201,6 +214,21 @@ export default function MoonViewer() {
     });
   };
 
+  // The presets leave the surface.
+  const goTo = (fly) => {
+    withViewer(fly);
+    setOnSurface(false);
+    setStatus(HELP);
+  };
+
+  const look = (getPosition, name) => {
+    withViewer((Cesium, viewer) => {
+      const time = viewer.clock.currentTime;
+      const visible = lookAt(Cesium, viewer, getPosition(Cesium, time));
+      setStatus(visible ? HELP : `The ${name} is below the horizon from here.`);
+    });
+  };
+
   return (
     <>
       <div ref={hostRef} className="cesium-host" />
@@ -209,12 +237,18 @@ export default function MoonViewer() {
         <h1>🌕 Moon</h1>
         <p>Real-time lunar position computed with Cesium.</p>
 
-        <button onClick={() => withViewer((C, v) => flyToSystem(C, v))}>
-          ☀️ Sun, Earth &amp; Moon
-        </button>
-        <button onClick={() => withViewer((C, v) => flyToMoon(C, v))}>
-          🌕 Moon close-up
-        </button>
+        <button onClick={() => goTo(flyToSystem)}>☀️ Sun, Earth &amp; Moon</button>
+        <button onClick={() => goTo(flyToMoon)}>🌕 Moon close-up</button>
+        {onSurface && (
+          <>
+            <button onClick={() => look(getEarthPosition, "Earth")}>
+              🌍 Look at Earth
+            </button>
+            <button onClick={() => look(getSunPosition, "Sun")}>
+              ☀️ Look at Sun
+            </button>
+          </>
+        )}
 
         <div className="row">
           <button onClick={togglePlay}>{paused ? "▶ Play" : "⏸ Pause"}</button>
@@ -412,24 +446,79 @@ function flyToMoon(Cesium, viewer) {
 }
 
 const EYE_HEIGHT = 2; // meters above the ground when standing
+const MAX_PITCH = (85 * Math.PI) / 180; // how far the standing camera looks up or down
+const DOWNHILL_DISTANCE = 500; // meters: where standOn compares the ground around
 
-/** Preset 3: stand on the Moon at `position`, free to look around. */
+/** Preset 3: stand on the Moon at `position`, facing downhill, free to look around. */
 async function standOn(Cesium, viewer, position) {
   const point = Cesium.Cartographic.fromCartesian(position);
   const pickedHeight = point.height;
+  // Ground in 8 directions around the point: facing uphill, the slope fills the view.
+  const enu = Cesium.Transforms.eastNorthUpToFixedFrame(position);
+  const around = Array.from({ length: 8 }, (_, i) => {
+    const heading = (i * Math.PI) / 4;
+    const offset = new Cesium.Cartesian3(
+      DOWNHILL_DISTANCE * Math.sin(heading),
+      DOWNHILL_DISTANCE * Math.cos(heading),
+      0,
+    );
+    return Cesium.Cartographic.fromCartesian(
+      Cesium.Matrix4.multiplyByPoint(enu, offset, offset),
+    );
+  });
   // The pick used the coarse tiles of the current view: ask for the finest.
-  await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [point]).catch(
-    () => {},
-  );
+  await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [
+    point,
+    ...around,
+  ]).catch(() => {});
   if (viewer.isDestroyed()) return;
   point.height = (point.height ?? pickedHeight) + EYE_HEIGHT;
+
+  let heading = viewer.camera.heading;
+  let lowest = Infinity;
+  around.forEach((ground, i) => {
+    if (ground.height < lowest) {
+      lowest = ground.height;
+      heading = (i * Math.PI) / 4;
+    }
+  });
 
   setStanding(viewer, true);
   viewer.camera.flyTo({
     destination: Cesium.Cartographic.toCartesian(point),
-    orientation: { heading: viewer.camera.heading, pitch: 0, roll: 0 },
+    orientation: { heading, pitch: 0, roll: 0 },
     duration: 2,
   });
+}
+
+/** Turns the standing camera towards `target`; false if it is below the horizon. */
+function lookAt(Cesium, viewer, target) {
+  const { Cartesian3, Matrix4 } = Cesium;
+  const position = Cartesian3.clone(viewer.camera.positionWC);
+  const toLocal = Matrix4.inverseTransformation(
+    Cesium.Transforms.eastNorthUpToFixedFrame(position),
+    new Matrix4(),
+  );
+  const local = Cartesian3.normalize(
+    Matrix4.multiplyByPointAsVector(
+      toLocal,
+      Cartesian3.subtract(target, position, new Cartesian3()),
+      new Cartesian3(),
+    ),
+    new Cartesian3(),
+  );
+  const pitch = Math.asin(local.z);
+  viewer.camera.flyTo({
+    destination: position,
+    orientation: {
+      heading: Math.atan2(local.x, local.y),
+      // Below the horizon: face its direction, looking straight ahead.
+      pitch: Cesium.Math.clamp(pitch, 0, MAX_PITCH),
+      roll: 0,
+    },
+    duration: 1,
+  });
+  return pitch > 0;
 }
 
 /** Standing turns off Cesium's camera controls; the drag handler turns the view instead. */
