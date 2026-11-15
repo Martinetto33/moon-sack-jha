@@ -291,7 +291,7 @@ export default function MoonViewer() {
           </div>
 
           <button onClick={() => fileInputRef.current.click()}>
-            ➕ Add landing sites
+            ➕ Add landing site
           </button>
           <input
             ref={fileInputRef}
