@@ -116,9 +116,49 @@ export default function MoonViewer() {
         );
       });
 
-      // Start with the Earth–Moon system in view.
-      flyToEarthMoon(Cesium, viewer, 0);
-      setStatus("Drag to rotate · scroll to zoom · right-drag to tilt");
+      // Preset 3: double-click the Moon to stand on that point.
+      // Landing sites will call standOn the same way.
+      const input = viewer.screenSpaceEventHandler;
+      input.setInputAction((click) => {
+        const ray = viewer.camera.getPickRay(click.position);
+        const position = ray && viewer.scene.globe.pick(ray, viewer.scene);
+        if (position) standOn(Cesium, viewer, position);
+      }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+      // While standing, dragging turns the view and keeps the horizon level.
+      let dragFrom;
+      input.setInputAction((down) => {
+        dragFrom = Cesium.Cartesian2.clone(down.position);
+      }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+      input.setInputAction(() => {
+        dragFrom = undefined;
+      }, Cesium.ScreenSpaceEventType.LEFT_UP);
+      input.setInputAction((move) => {
+        if (!dragFrom || !isStanding(viewer)) return;
+        const camera = viewer.camera;
+        const radiansPerPixel = camera.frustum.fovy / viewer.canvas.clientHeight;
+        const maxPitch = Cesium.Math.toRadians(85);
+        camera.setView({
+          orientation: {
+            heading:
+              camera.heading -
+              (move.endPosition.x - dragFrom.x) * radiansPerPixel,
+            pitch: Cesium.Math.clamp(
+              camera.pitch + (move.endPosition.y - dragFrom.y) * radiansPerPixel,
+              -maxPitch,
+              maxPitch,
+            ),
+            roll: 0,
+          },
+        });
+        dragFrom = Cesium.Cartesian2.clone(move.endPosition, dragFrom);
+      }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+      // Start with the Sun, the Earth and the Moon in view.
+      flyToSystem(Cesium, viewer, 0);
+      setStatus(
+        "Drag to rotate · scroll to zoom · right-drag to tilt · double-click the Moon to stand on it",
+      );
     })().catch((err) => {
       console.error(err);
       setStatus("Failed to load Cesium. Check the console.");
@@ -160,19 +200,11 @@ export default function MoonViewer() {
         <h1>🌕 Moon</h1>
         <p>Real-time lunar position computed with Cesium.</p>
 
-        <button onClick={() => withViewer((C, v) => flyToEarthMoon(C, v, 1))}>
-          🌍 Earth–Moon system
+        <button onClick={() => withViewer((C, v) => flyToSystem(C, v))}>
+          ☀️ Sun, Earth &amp; Moon
         </button>
-        <button onClick={() => withViewer((C, v) => flyToMoon(C, v, 3.5))}>
-          🔭 Moon orbit view
-        </button>
-        <button onClick={() => withViewer((C, v) => flyToMoon(C, v, 1.15))}>
-          🧑‍🚀 Surface close-up
-        </button>
-        <button
-          onClick={() => withViewer((C, v) => flyToMoon(C, v, 1.15, true))}
-        >
-          ☀️ Sun-facing side
+        <button onClick={() => withViewer((C, v) => flyToMoon(C, v))}>
+          🌕 Moon close-up
         </button>
 
         <div className="row">
@@ -235,30 +267,64 @@ function getEarthOrientation(Cesium, time) {
   );
 }
 
-function flyToEarthMoon(Cesium, viewer, duration) {
-  const sphere = Cesium.BoundingSphere.fromPoints([
-    Cesium.Cartesian3.ZERO,
-    getEarthPosition(Cesium, viewer.clock.currentTime),
-  ]);
-  viewer.camera.flyToBoundingSphere(sphere, { duration });
+/** Distance at which a sphere of `radius` fits the narrower field of view. */
+function fitDistance(viewer, radius) {
+  const { fovy, aspectRatio } = viewer.camera.frustum;
+  return radius / (Math.tan(fovy / 2) * Math.min(1, aspectRatio));
 }
 
-/**
- * Looks at the Moon from the Earth side, or from the Sun side.
- * @param {number} distanceFactor  a sphere this many Moon radii wide fills the view
- * @param {boolean} sunFacing      if true, place the camera on the Sun side
- */
-function flyToMoon(Cesium, viewer, distanceFactor, sunFacing = false) {
+/** Preset 1: Earth and Moon in the middle, the Sun near a top corner. */
+function flyToSystem(Cesium, viewer, duration = 2) {
+  const { Cartesian3 } = Cesium;
+  setStanding(viewer, false);
   const time = viewer.clock.currentTime;
+  const toSun = getSunPosition(Cesium, time);
+
+  // Look a bit beside and below the Sun (60% of the half field of view
+  // each way); Moon-fixed Z is close to the normal of the Moon's orbit.
+  const { fovy, aspectRatio } = viewer.camera.frustum;
+  const halfFovX = Math.atan(Math.tan(fovy / 2) * aspectRatio);
+  const azimuth = Math.atan2(toSun.y, toSun.x) + 0.6 * halfFovX;
+  const down = 0.6 * (fovy / 2);
+  const direction = new Cartesian3(
+    Math.cos(azimuth) * Math.cos(down),
+    Math.sin(azimuth) * Math.cos(down),
+    -Math.sin(down),
+  );
+  const right = Cartesian3.cross(direction, Cartesian3.UNIT_Z, new Cartesian3());
+  const up = Cartesian3.normalize(
+    Cartesian3.cross(right, direction, right),
+    right,
+  );
+
+  const centre = Cartesian3.multiplyByScalar(
+    getEarthPosition(Cesium, time),
+    0.5,
+    new Cartesian3(),
+  );
+  const distance = fitDistance(
+    viewer,
+    Cartesian3.magnitude(centre) + EARTH_RADIUS,
+  );
+  viewer.camera.flyTo({
+    destination: Cartesian3.subtract(
+      centre,
+      Cartesian3.multiplyByScalar(direction, distance, new Cartesian3()),
+      new Cartesian3(),
+    ),
+    orientation: { direction, up },
+    duration,
+  });
+}
+
+/** Preset 2: the near side of the Moon fills most of the view. */
+function flyToMoon(Cesium, viewer) {
+  setStanding(viewer, false);
   const from = Cesium.Cartesian3.normalize(
-    sunFacing ? getSunPosition(Cesium, time) : getEarthPosition(Cesium, time),
+    getEarthPosition(Cesium, viewer.clock.currentTime),
     new Cesium.Cartesian3(),
   );
-  // Same framing as flyToBoundingSphere: fit the narrower field of view.
-  const { fovy, aspectRatio } = viewer.camera.frustum;
-  const distance =
-    (MOON_RADIUS * distanceFactor) /
-    (Math.tan(fovy / 2) * Math.min(1, aspectRatio));
+  const distance = fitDistance(viewer, MOON_RADIUS * 1.1);
 
   viewer.camera.flyTo({
     destination: Cesium.Cartesian3.multiplyByScalar(
@@ -272,6 +338,44 @@ function flyToMoon(Cesium, viewer, distanceFactor, sunFacing = false) {
     },
     duration: 2,
   });
+}
+
+const EYE_HEIGHT = 2; // meters above the ground when standing
+
+/** Preset 3: stand on the Moon at `position`, free to look around. */
+async function standOn(Cesium, viewer, position) {
+  const point = Cesium.Cartographic.fromCartesian(position);
+  const pickedHeight = point.height;
+  // The pick used the coarse tiles of the current view: ask for the finest.
+  await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [point]).catch(
+    () => {},
+  );
+  if (viewer.isDestroyed()) return;
+  point.height = (point.height ?? pickedHeight) + EYE_HEIGHT;
+
+  setStanding(viewer, true);
+  viewer.camera.flyTo({
+    destination: Cesium.Cartographic.toCartesian(point),
+    orientation: { heading: viewer.camera.heading, pitch: 0, roll: 0 },
+    duration: 2,
+  });
+}
+
+/** Standing turns off Cesium's camera controls; the drag handler turns the view instead. */
+function setStanding(viewer, standing) {
+  const controller = viewer.scene.screenSpaceCameraController;
+  controller.enableRotate = !standing;
+  controller.enableTranslate = !standing;
+  controller.enableZoom = !standing;
+  controller.enableTilt = !standing;
+  controller.enableLook = !standing;
+  // Otherwise the camera is pushed above the coarse tiles drawn when the
+  // flight ends and stays there, tens of meters up, once finer tiles load.
+  controller.enableCollisionDetection = !standing;
+}
+
+function isStanding(viewer) {
+  return !viewer.scene.screenSpaceCameraController.enableRotate;
 }
 
 /** Sun's centre in the Moon-fixed frame (meters). */
