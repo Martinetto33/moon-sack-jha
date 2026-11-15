@@ -35,6 +35,33 @@ export function buildUrl(target, latitude, longitude, startTime, stopTime, stepU
     return `${API}?${p}`;
 }
 
+/**
+ * 
+ * @param {TargetPlanet} target planet
+ * @param {number} latitude 
+ * @param {number} longitude 
+ * @param {Date} selectedTime 
+ * @returns {string}
+ */
+export function buildUrlWithTwoMonthFrame(target, latitude, longitude, selectedTime) {
+  const p = new URLSearchParams({
+        format: "text",
+        COMMAND: quoted(target.horizonsId),
+        OBJ_DATA: quoted("NO"),
+        MAKE_EPHEM: quoted("YES"),
+        EPHEM_TYPE: quoted("OBSERVER"),
+        CENTER: quoted("coord@301"),
+        COORD_TYPE: quoted("GEODETIC"),
+        SITE_COORD: quoted(`${normLon(longitude)},${latitude},0`),
+        START_TIME: toHorizonsTime(selectedTime.plus),
+        STOP_TIME: toHorizonsTime(stopTime),
+        STEP_SIZE: quoted(`${step} ${stepUnit}`),
+        QUANTITIES: quoted("4"),
+        ANG_FORMAT: quoted("DEG"),
+    });
+    return `${API}?${p}`;
+}
+
 /** 
  * Returns data for the specified time window, at the specified stepping rate.
  * The input data is interpreted as follows:

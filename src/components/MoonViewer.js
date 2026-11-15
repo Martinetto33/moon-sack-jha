@@ -5,6 +5,8 @@ import SummaryPanel from "./SummaryPanel";
 import { MoonDataDTO, TARGET_PLANETS } from "../app/api/MoonData.js";
 import { SummaryCreator } from "../app/api/Summary.js";
 import { parseLandingSites } from "./landingSites";
+import SidePanel from "./SidePanel";
+import "../resources/css/main.css";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const MOON_RADIUS = 1737400; // meters
@@ -93,7 +95,8 @@ export default function MoonViewer() {
           tileMatrixSetID: "default028mm",
           tilingScheme: new Cesium.GeographicTilingScheme(),
           maximumLevel: 8,
-          credit: "LROC WAC mosaic: NASA/GSFC/Arizona State University, via NASA Moon Trek",
+          credit:
+            "LROC WAC mosaic: NASA/GSFC/Arizona State University, via NASA Moon Trek",
         }),
       );
 
@@ -110,7 +113,11 @@ export default function MoonViewer() {
       // for the Moon drawn around the globe when it would look too small.
       // Both are enlarged so they never look smaller than MIN_SCREEN_RADIUS.
       const earth = viewer.scene.primitives.add(
-        texturedSphere(Cesium, EARTH_RADIUS, `${BASE}/textures/earth-texture.jpg`),
+        texturedSphere(
+          Cesium,
+          EARTH_RADIUS,
+          `${BASE}/textures/earth-texture.jpg`,
+        ),
       );
       const moonStandIn = viewer.scene.primitives.add(
         texturedSphere(
@@ -169,14 +176,16 @@ export default function MoonViewer() {
       input.setInputAction((move) => {
         if (!dragFrom || !isStanding(viewer)) return;
         const camera = viewer.camera;
-        const radiansPerPixel = camera.frustum.fovy / viewer.canvas.clientHeight;
+        const radiansPerPixel =
+          camera.frustum.fovy / viewer.canvas.clientHeight;
         camera.setView({
           orientation: {
             heading:
               camera.heading -
               (move.endPosition.x - dragFrom.x) * radiansPerPixel,
             pitch: Cesium.Math.clamp(
-              camera.pitch + (move.endPosition.y - dragFrom.y) * radiansPerPixel,
+              camera.pitch +
+                (move.endPosition.y - dragFrom.y) * radiansPerPixel,
               -MAX_PITCH,
               MAX_PITCH,
             ),
@@ -263,11 +272,14 @@ export default function MoonViewer() {
 
       <div className="overlay">
         <div className="controls">
+          <SidePanel className="panel"></SidePanel>
           <h1>🌕 Moon</h1>
           <p>Real-time lunar position computed with Cesium.</p>
 
           <div className="row">
-            <button onClick={togglePlay}>{paused ? "▶ Play" : "⏸ Pause"}</button>
+            <button onClick={togglePlay}>
+              {paused ? "▶ Play" : "⏸ Pause"}
+            </button>
             <button
               onClick={() =>
                 withViewer((C, v) => (v.clock.currentTime = C.JulianDate.now()))
@@ -284,7 +296,7 @@ export default function MoonViewer() {
           </div>
 
           <button onClick={() => fileInputRef.current.click()}>
-            ➕ Add landing sites
+            ➕ Add landing site
           </button>
           <input
             ref={fileInputRef}
@@ -297,30 +309,10 @@ export default function MoonViewer() {
         </div>
 
         <nav className="nav">
-          <button onClick={() => goTo(flyToSystem)}>☀️ Sun, Earth &amp; Moon</button>
+          <button onClick={() => goTo(flyToSystem)}>
+            ☀️ Sun, Earth &amp; Moon
+          </button>
           <button onClick={() => goTo(flyToMoon)}>🌕 Moon close-up</button>
-          {/* Example PrimeReact Button */}
-          {/* <Button
-            label="Random location"
-            icon="pi pi-map-marker"
-            onClick={() =>
-              withViewer((C, v) => {
-                const longitude = Math.random() * 360 - 180;
-                const latitude =
-                  (Math.asin(Math.random() * 2 - 1) * 180) / Math.PI;
-                standOn(
-                  C,
-                  v,
-                  C.Cartesian3.fromDegrees(
-                    longitude,
-                    latitude,
-                    0,
-                    C.Ellipsoid.MOON,
-                  ),
-                );
-              })
-            }
-          /> */}
           {onSurface && (
             <>
               <button onClick={() => look(getEarthPosition, "Earth")}>
@@ -541,7 +533,11 @@ function flyToSystem(Cesium, viewer, duration = 2) {
     Math.sin(azimuth) * Math.cos(down),
     -Math.sin(down),
   );
-  const right = Cartesian3.cross(direction, Cartesian3.UNIT_Z, new Cartesian3());
+  const right = Cartesian3.cross(
+    direction,
+    Cartesian3.UNIT_Z,
+    new Cartesian3(),
+  );
   const up = Cartesian3.normalize(
     Cartesian3.cross(right, direction, right),
     right,

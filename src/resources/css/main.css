@@ -1,0 +1,80 @@
+.p-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.p-panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.p-panel,
+.p-panel-header,
+.p-panel-content {
+  padding: 0.75rem !important;
+}
+
+.p-panel > *,
+.p-inputtext,
+.p-scrollpanel-content {
+  width: 100%;
+}
+
+.p-inputtext {
+  padding: 0.5rem !important;
+}
+
+.title {
+  font-size: 2em;
+  font-weight: bold;
+}
+
+.slider-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.p-scrollpanel {
+  margin-top: 1rem;
+}
+
+.p-scrollpanel-content {
+  padding: 0 0.75rem 2rem 0;
+  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.p-panel {
+  padding: 1rem !important;
+}
+
+.p-card .p-card-title {
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.p-card {
+  border: 1px solid #fbbf24;
+}
+
+.p-card .p-card-body {
+  padding: 0.75rem;
+}
+
+.p-card .p-card-content {
+  padding: 0;
+}
+
+/* Nasconde la scrollbar nativa del contenitore, mantenendo lo scroll funzionante */
+.p-scrollpanel-content {
+  scrollbar-width: none; /* Firefox */
+}
+
+.p-scrollpanel-content::-webkit-scrollbar {
+  display: none; /* Chrome, Edge, Safari */
+}
