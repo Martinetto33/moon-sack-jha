@@ -52,7 +52,7 @@ export default function MoonViewer() {
         skyBox: Cesium.SkyBox.createEarthSkyBox(),
         baseLayerPicker: false,
         animation: false,
-        timeline: false,
+        timeline: true,
         geocoder: false,
         homeButton: false,
         sceneModePicker: false,
