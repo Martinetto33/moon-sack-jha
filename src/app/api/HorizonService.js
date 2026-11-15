@@ -13,7 +13,8 @@ export const TIME_UNITS = Object.freeze({
 
 /** @typedef {typeof TIME_UNITS[keyof typeof TIME_UNITS]} TimeUnit */
 
-const API = "https://ssd.jpl.nasa.gov/api/horizons.api";
+// Horizons sends no CORS headers: worker/ forwards the query to it and adds them.
+const API = "https://horizons-proxy.alessio-lizza.workers.dev/";
 const quoted = v => `'${v}'`;
 const toHorizonsTime = d => quoted(d.toISOString().slice(0, 16).replace("T", " ")); // UT
 const normLon = lon => Number((((lon % 360) + 360) % 360).toFixed(6)); // map longitude to 0-360 range for correctness
