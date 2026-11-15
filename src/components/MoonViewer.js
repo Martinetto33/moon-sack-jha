@@ -394,13 +394,10 @@ export default function MoonViewer() {
             />
           </div>
           <div className="moon">
-            <h1>🌕 Moon</h1>
             <p className="small-subtext">
               Drag to rotate, scroll to zoom, shift+drag to pan, double-click
               the Moon to stand on it
             </p>
-            <p>Real-time lunar position computed with Cesium.</p>
-
             <div className="row">
               <button onClick={togglePlay}>
                 {paused ? "▶ Play" : "⏸ Pause"}
