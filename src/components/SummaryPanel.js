@@ -15,21 +15,37 @@ export default function SummaryPanel({
     const panel = panelRef.current;
     if (!panel) return;
 
-    const bounds = panel.getBoundingClientRect();
-    const shiftX =
-      Math.min(0, window.innerWidth - 8 - bounds.right) +
-      Math.max(0, 8 - bounds.left);
-    const shiftY =
-      Math.min(0, window.innerHeight - 8 - bounds.bottom) +
-      Math.max(0, 8 - bounds.top);
+    const keepPanelInViewport = () => {
+      const bounds = panel.getBoundingClientRect();
+      const shiftX =
+        bounds.width > window.innerWidth - 16
+          ? 8 - bounds.left
+          : Math.min(0, window.innerWidth - 8 - bounds.right) +
+            Math.max(0, 8 - bounds.left);
+      const shiftY =
+        bounds.height > window.innerHeight - 16
+          ? 8 - bounds.top
+          : Math.min(0, window.innerHeight - 8 - bounds.bottom) +
+            Math.max(0, 8 - bounds.top);
 
-    if (shiftX || shiftY) {
-      setPosition((current) => ({
-        x: current.x + shiftX,
-        y: current.y + shiftY,
-      }));
-    }
-  }, [isMinimized]);
+      if (shiftX || shiftY) {
+        setPosition((current) => ({
+          x: current.x + shiftX,
+          y: current.y + shiftY,
+        }));
+      }
+    };
+
+    keepPanelInViewport();
+    const resizeObserver = new ResizeObserver(keepPanelInViewport);
+    resizeObserver.observe(panel);
+    window.addEventListener("resize", keepPanelInViewport);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", keepPanelInViewport);
+    };
+  }, [isMinimized, isRendered]);
 
   if (!isRendered) return null;
 
@@ -106,105 +122,109 @@ export default function SummaryPanel({
 
       {!isMinimized && summary && (
         <>
-          <div className="summary-overview">
-            <span>
-              <strong>Selected:</strong> {formatUtc(summary.selectedTime)}
-            </span>
-            <span>
-              <strong>Window:</strong> {formatUtc(summary.timeWindow.start)} –{" "}
-              {formatUtc(summary.timeWindow.end)}
-            </span>
-            <span>
-              <strong>Site:</strong>{" "}
-              Lat {formatCoordinate(summary.closestMoonToEarth.latitude)}, Lon{" "}
-              {formatCoordinate(summary.closestMoonToEarth.longitude)}
-            </span>
-          </div>
+          <div className="summary-body">
+            <div className="summary-overview">
+              <span>
+                <strong>Selected:</strong> {formatUtc(summary.selectedTime)}
+              </span>
+              <span>
+                <strong>Window:</strong> {formatUtc(summary.timeWindow.start)} –{" "}
+                {formatUtc(summary.timeWindow.end)}
+              </span>
+              <span>
+                <strong>Site:</strong>{" "}
+                Lat {formatCoordinate(summary.closestMoonToEarth.latitude)}, Lon{" "}
+                {formatCoordinate(summary.closestMoonToEarth.longitude)}
+              </span>
+            </div>
 
-          <div className="summary-content">
-            <section className="summary-target">
-              <h3>Earth visibility</h3>
-              <dl>
-                <Metric
-                  label="Elevation"
-                  value={formatAngle(
-                    summary.earth.elevation,
-                    summary.earth.elevationDifference,
-                  )}
-                />
-                <Metric
-                  label="Azimuth"
-                  value={formatAngle(
-                    summary.earth.azimuth,
-                    summary.earth.azimuthDifference,
-                  )}
-                />
-                <Metric
-                  label="Closest elevation target"
-                  value={formatUtc(summary.earth.closestElevationTime)}
-                />
-                <Metric
-                  label="Closest azimuth target"
-                  value={formatUtc(summary.earth.closestAzimuthTime)}
-                />
-                <Metric
-                  label="Communication duration (query window)"
-                  value={formatDuration(summary.communicationDuration)}
-                />
-                <Metric
-                  className="summary-window"
-                  label="Communication window (UTC day)"
-                  value={summary.communicationTimeWindow}
-                />
-              </dl>
-            </section>
+            <div className="summary-content">
+              <section className="summary-target">
+                <h3>Earth visibility</h3>
+                <dl>
+                  <Metric
+                    label="Elevation"
+                    value={formatAngle(
+                      summary.earth.elevation,
+                      summary.earth.elevationDifference,
+                    )}
+                  />
+                  <Metric
+                    label="Azimuth"
+                    value={formatAngle(
+                      summary.earth.azimuth,
+                      summary.earth.azimuthDifference,
+                    )}
+                  />
+                  <Metric
+                    label="Closest elevation target"
+                    value={formatUtc(summary.earth.closestElevationTime)}
+                  />
+                  <Metric
+                    label="Closest azimuth target"
+                    value={formatUtc(summary.earth.closestAzimuthTime)}
+                  />
+                  <Metric
+                    label="Communication duration (query window)"
+                    value={formatDuration(summary.communicationDuration)}
+                  />
+                  <Metric
+                    className="summary-window"
+                    label="Communication window (UTC day)"
+                    value={summary.communicationTimeWindow}
+                  />
+                </dl>
+              </section>
 
-            <section className="summary-target">
-              <h3>Sunlight</h3>
-              <dl>
-                <Metric
-                  label="Elevation"
-                  value={formatAngle(
-                    summary.sun.elevation,
-                    summary.sun.elevationDifference,
-                  )}
-                />
-                <Metric
-                  label="Azimuth"
-                  value={formatAngle(
-                    summary.sun.azimuth,
-                    summary.sun.azimuthDifference,
-                  )}
-                />
-                <Metric
-                  label="Closest elevation target"
-                  value={formatUtc(summary.sun.closestElevationTime)}
-                />
-                <Metric
-                  label="Closest azimuth target"
-                  value={formatUtc(summary.sun.closestAzimuthTime)}
-                />
-                <Metric
-                  label="Sunlight duration (query window)"
-                  value={formatDuration(summary.sunlightDuration)}
-                />
-                <Metric
-                  className="summary-window"
-                  label="Sunlight window (UTC day)"
-                  value={summary.sunlightTimeWindow}
-                />
-              </dl>
-            </section>
+              <section className="summary-target">
+                <h3>Sunlight</h3>
+                <dl>
+                  <Metric
+                    label="Elevation"
+                    value={formatAngle(
+                      summary.sun.elevation,
+                      summary.sun.elevationDifference,
+                    )}
+                  />
+                  <Metric
+                    label="Azimuth"
+                    value={formatAngle(
+                      summary.sun.azimuth,
+                      summary.sun.azimuthDifference,
+                    )}
+                  />
+                  <Metric
+                    label="Closest elevation target"
+                    value={formatUtc(summary.sun.closestElevationTime)}
+                  />
+                  <Metric
+                    label="Closest azimuth target"
+                    value={formatUtc(summary.sun.closestAzimuthTime)}
+                  />
+                  <Metric
+                    label="Sunlight duration (query window)"
+                    value={formatDuration(summary.sunlightDuration)}
+                  />
+                  <Metric
+                    className="summary-window"
+                    label="Sunlight window (UTC day)"
+                    value={summary.sunlightTimeWindow}
+                  />
+                </dl>
+              </section>
+            </div>
           </div>
         </>
       )}
       {!isMinimized && !summary && (
-        <p
-          className={`summary-message summary-message--${summaryStatus.kind}`}
-          role={summaryStatus.kind === "error" ? "alert" : "status"}
-        >
-          {summaryStatus.message}
-        </p>
+        <div className="summary-body">
+          <p
+            className={`summary-message summary-message--${summaryStatus.kind}`}
+            role={summaryStatus.kind === "error" ? "alert" : "status"}
+          >
+            {summaryStatus.message}
+          </p>
+        </div>
       )}
     </section>
   );
