@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "primereact/button";
+import { parseLandingSites } from "./landingSites";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const MOON_RADIUS = 1737400; // meters
@@ -20,6 +21,9 @@ export default function MoonViewer() {
   const [status, setStatus] = useState("Initializing Cesium…");
   const [paused, setPaused] = useState(false);
   const [onSurface, setOnSurface] = useState(false);
+  // Every site from the loaded GeoJSON files (see parseLandingSites).
+  const [landingSites, setLandingSites] = useState([]);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     let disposed = false;
@@ -215,6 +219,24 @@ export default function MoonViewer() {
     });
   };
 
+  const addLandingSites = async (event) => {
+    const files = [...event.target.files];
+    event.target.value = ""; // so the same file can be picked again
+    for (const file of files) {
+      try {
+        const sites = parseLandingSites(await file.text(), file.name);
+        // Adding a file again replaces its sites.
+        setLandingSites((current) => [
+          ...current.filter((site) => site.source !== file.name),
+          ...sites,
+        ]);
+        setStatus(`Added ${sites.length} landing sites from ${file.name}.`);
+      } catch (err) {
+        setStatus(`Could not read ${file.name}: ${err.message}.`);
+      }
+    }
+  };
+
   // The presets leave the surface.
   const goTo = (fly) => {
     withViewer(fly);
@@ -255,6 +277,18 @@ export default function MoonViewer() {
             <button onClick={() => setSpeed(3600)}>1 h/s</button>
             <button onClick={() => setSpeed(86400)}>1 d/s</button>
           </div>
+
+          <button onClick={() => fileInputRef.current.click()}>
+            ➕ Add landing sites
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".geojson,.json,application/geo+json,application/json"
+            multiple
+            hidden
+            onChange={addLandingSites}
+          />
         </div>
 
         <nav className="nav">
