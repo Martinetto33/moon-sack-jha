@@ -11,21 +11,18 @@ export default function SidePanel() {
   const [commValue, setCommValue] = useState(80);
   return (
     <Panel header="Landing Sites">
-      <p>Brightness</p>
+      <p class="title">Brightness</p>
       <SliderComponent></SliderComponent>
 
-      <p>Communication</p>
+      <p class="title">Communication</p>
       <SliderComponent></SliderComponent>
 
       <ScrollPanel style={{ width: "100%", height: "200px" }}>
         <div className="card">
-          <Card title="Simple Card">
-            <p className="m-0">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit.
-              Inventore sed consequuntur error repudiandae numquam deserunt
-              quisquam repellat libero asperiores earum nam nobis, culpa ratione
-              quam perferendis esse, cupiditate neque quas!
-            </p>
+          <Card title="Landing Site Name">
+            <p className="m-0">Type</p>
+            <p className="m-0">Lat - Lon</p>
+            <p className="m-0">desc</p>
           </Card>
         </div>
       </ScrollPanel>

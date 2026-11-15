@@ -7,7 +7,7 @@ export default function SliderComponent() {
 
   return (
     <div className="card flex justify-content-center">
-      <div className="w-14rem">
+      <div className="w-14rem slider-input">
         <InputText
           value={value}
           onChange={(e) => setValue(e.target.value)}

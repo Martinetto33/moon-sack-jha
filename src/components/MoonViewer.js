@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "primereact/button";
 import SidePanel from "./SidePanel";
+import "../resources/css/main.css";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const MOON_RADIUS = 1737400; // meters
@@ -168,14 +169,16 @@ export default function MoonViewer() {
       input.setInputAction((move) => {
         if (!dragFrom || !isStanding(viewer)) return;
         const camera = viewer.camera;
-        const radiansPerPixel = camera.frustum.fovy / viewer.canvas.clientHeight;
+        const radiansPerPixel =
+          camera.frustum.fovy / viewer.canvas.clientHeight;
         camera.setView({
           orientation: {
             heading:
               camera.heading -
               (move.endPosition.x - dragFrom.x) * radiansPerPixel,
             pitch: Cesium.Math.clamp(
-              camera.pitch + (move.endPosition.y - dragFrom.y) * radiansPerPixel,
+              camera.pitch +
+                (move.endPosition.y - dragFrom.y) * radiansPerPixel,
               -MAX_PITCH,
               MAX_PITCH,
             ),
@@ -241,67 +244,8 @@ export default function MoonViewer() {
       <div ref={hostRef} className="cesium-host" />
 
       <div className="controls">
-        <SidePanel></SidePanel>
-        <h1>🌕 Moon</h1>
-        <p>Real-time lunar position computed with Cesium.</p>
-
-          <div className="row">
-            <button onClick={togglePlay}>{paused ? "▶ Play" : "⏸ Pause"}</button>
-            <button
-              onClick={() =>
-                withViewer((C, v) => (v.clock.currentTime = C.JulianDate.now()))
-              }
-            >
-              ⟲ Now
-            </button>
-          </div>
-
-          <div className="row">
-            <button onClick={() => setSpeed(1)}>1×</button>
-            <button onClick={() => setSpeed(3600)}>1 h/s</button>
-            <button onClick={() => setSpeed(86400)}>1 d/s</button>
-          </div>
-        </div>
-
-        <nav className="nav">
-          <button onClick={() => goTo(flyToSystem)}>☀️ Sun, Earth &amp; Moon</button>
-          <button onClick={() => goTo(flyToMoon)}>🌕 Moon close-up</button>
-          {/* Example PrimeReact Button */}
-          {/* <Button
-            label="Random location"
-            icon="pi pi-map-marker"
-            onClick={() =>
-              withViewer((C, v) => {
-                const longitude = Math.random() * 360 - 180;
-                const latitude =
-                  (Math.asin(Math.random() * 2 - 1) * 180) / Math.PI;
-                standOn(
-                  C,
-                  v,
-                  C.Cartesian3.fromDegrees(
-                    longitude,
-                    latitude,
-                    0,
-                    C.Ellipsoid.MOON,
-                  ),
-                );
-              })
-            }
-          /> */}
-          {onSurface && (
-            <>
-              <button onClick={() => look(getEarthPosition, "Earth")}>
-                🌍 Look at Earth
-              </button>
-              <button onClick={() => look(getSunPosition, "Sun")}>
-                ☀️ Look at Sun
-              </button>
-            </>
-          )}
-        </nav>
+        <SidePanel className="panel"></SidePanel>
       </div>
-
-      <div className="status">{status}</div>
     </>
   );
 }
