@@ -9,6 +9,8 @@ import { parseLandingSites } from "./landingSites";
 import SidePanel from "./SidePanel";
 import SimulationSites from "./SimulationSites";
 import "../resources/css/main.css";
+import { ClockRange } from "cesium";
+import DatePicker from "./DatePicker.js"
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const MOON_RADIUS = 1737400; // meters
