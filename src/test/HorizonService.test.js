@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import fs from "node:fs";
-import { parseHorizonsRows, buildUrl, getForLatAndLong } from "../app/api/HorizonService.js";
+import {
+  parseHorizonsRows,
+  buildUrl,
+  buildUrlWithTwoMonthFrame,
+  getForLatAndLong,
+} from "../app/api/HorizonService.js";
 import { TARGET_PLANETS } from "../app/api/MoonData.js";
 
 const sample = fs.readFileSync(
@@ -62,6 +67,17 @@ describe("buildUrl", () => {
     const lon = parseFloat(u.searchParams.get("SITE_COORD").replace(/'/g, "").split(",")[0]);
     expect(lon).toBeCloseTo(336.5726, 4);
   });
+
+  it("builds a two-month window with an hourly step", () => {
+    const selected = new Date("2026-12-31T12:34:56Z");
+    const u = new URL(
+      buildUrlWithTwoMonthFrame(TARGET_PLANETS.SUN, 0.674, 23.473, selected),
+    );
+
+    expect(u.searchParams.get("START_TIME")).toBe("'2026-12-31 12:34'");
+    expect(u.searchParams.get("STOP_TIME")).toBe("'2027-02-28 12:34'");
+    expect(u.searchParams.get("STEP_SIZE")).toBe("'1 h'");
+  });
 });
 
 describe("getForLatAndLong (mocked fetch)", () => {
@@ -77,6 +93,32 @@ describe("getForLatAndLong (mocked fetch)", () => {
   it("rejects on HTTP error", async () => {
     vi.stubGlobal("fetch", async () => ({ ok: false, status: 400, text: async () => "bad request" }));
     await expect(getForLatAndLong(...args)).rejects.toThrow(/400/);
+  });
+
+  it("uses the default two-month window when only a selected time is provided", async () => {
+    let requestedUrl;
+    vi.stubGlobal("fetch", async (url) => {
+      requestedUrl = url;
+      return { ok: true, text: async () => sample };
+    });
+
+    await getForLatAndLong(
+      TARGET_PLANETS.SUN,
+      0.674,
+      23.473,
+      new Date("2026-12-31T12:34:00Z"),
+    );
+
+    const u = new URL(requestedUrl);
+    expect(u.searchParams.get("START_TIME")).toBe("'2026-12-31 12:34'");
+    expect(u.searchParams.get("STOP_TIME")).toBe("'2027-02-28 12:34'");
+    expect(u.searchParams.get("STEP_SIZE")).toBe("'1 h'");
+  });
+
+  it("rejects incomplete explicit time windows", async () => {
+    await expect(
+      getForLatAndLong(TARGET_PLANETS.SUN, 0.674, 23.473, new Date(), new Date()),
+    ).rejects.toThrow(/stepUnit, and step/);
   });
 });
 
