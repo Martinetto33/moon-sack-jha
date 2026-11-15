@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Button } from "primereact/button";
+import { useEffect, useMemo, useRef, useState } from "react";
+import SummaryPanel from "./SummaryPanel";
+import { MoonDataDTO, TARGET_PLANETS } from "../app/api/MoonData.js";
+import { SummaryCreator } from "../app/api/Summary.js";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const MOON_RADIUS = 1737400; // meters
@@ -17,6 +19,7 @@ export default function MoonViewer() {
   const cesiumRef = useRef(null);
   const [status, setStatus] = useState("Initializing Cesium…");
   const [paused, setPaused] = useState(false);
+  const summary = useMemo(createMockSummary, []);
 
   useEffect(() => {
     let disposed = false;
@@ -202,6 +205,8 @@ export default function MoonViewer() {
     });
   };
 
+  let isSummaryRendered = true; // TODO: toggle based on camera state (set to true when camera is on Moon surface)
+
   return (
     <>
       <div ref={hostRef} className="cesium-host" />
@@ -258,8 +263,87 @@ export default function MoonViewer() {
       </div>
 
       <div className="status">{status}</div>
+
+      <SummaryPanel isRendered={isSummaryRendered} summary={summary} />
     </>
   );
+}
+
+function createMockSummary() {
+  const selectedTime = new Date();
+  const samples = [
+    {
+      hours: -12,
+      earthAzimuth: 20,
+      earthElevation: -25,
+      sunAzimuth: 300,
+      sunElevation: 18,
+    },
+    {
+      hours: -6,
+      earthAzimuth: 80,
+      earthElevation: -8,
+      sunAzimuth: 340,
+      sunElevation: 42,
+    },
+    {
+      hours: 0,
+      earthAzimuth: 145,
+      earthElevation: 12,
+      sunAzimuth: 20,
+      sunElevation: 55,
+    },
+    {
+      hours: 6,
+      earthAzimuth: 220,
+      earthElevation: 24,
+      sunAzimuth: 60,
+      sunElevation: 28,
+    },
+    {
+      hours: 12,
+      earthAzimuth: 300,
+      earthElevation: -15,
+      sunAzimuth: 100,
+      sunElevation: -10,
+    },
+  ];
+  const toMoonData = (target, azimuthKey, elevationKey) =>
+    samples.map(({ hours, ...sample }) => {
+      const time = new Date(selectedTime.getTime() + hours * 60 * 60 * 1000);
+      return new MoonDataDTO(
+        target,
+        time,
+        sample[azimuthKey],
+        sample[elevationKey],
+        false,
+        false,
+      );
+    });
+  const startTime = new Date(selectedTime.getTime() - 12 * 60 * 60 * 1000);
+  const endTime = new Date(selectedTime.getTime() + 12 * 60 * 60 * 1000);
+  const creator = new SummaryCreator({
+    latitude: 0.674,
+    longitude: 23.473,
+    startTime,
+    endTime,
+    moonToEarthDTOs: toMoonData(
+      TARGET_PLANETS.EARTH,
+      "earthAzimuth",
+      "earthElevation",
+    ),
+    moonToSunDTOs: toMoonData(
+      TARGET_PLANETS.SUN,
+      "sunAzimuth",
+      "sunElevation",
+    ),
+    wantedTargets: {
+      earth: { elevation: 15, azimuth: 180 },
+      sun: { elevation: 45, azimuth: 0 },
+    },
+  });
+
+  return creator.selectTime(selectedTime);
 }
 
 /** Rotation from ICRF to the Moon-fixed frame (IAU model). */

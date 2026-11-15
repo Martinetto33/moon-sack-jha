@@ -35,6 +35,73 @@ body {
   backdrop-filter: blur(6px);
 }
 
+.summary-overlay {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  box-sizing: border-box;
+  width: min(620px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(10, 12, 20, 0.9);
+  color: #e6e6e6;
+  backdrop-filter: blur(8px);
+}
+
+.summary-header h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.summary-overview {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  color: #ccc;
+  font-size: 12px;
+}
+
+.summary-splitter {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.summary-target {
+  min-width: 0;
+  padding: 10px;
+  overflow: auto;
+}
+
+.summary-target h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.summary-target dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.summary-target dl > div {
+  min-width: 0;
+}
+
+.summary-target dt {
+  color: #bbb;
+}
+
+.summary-target dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.summary-target .summary-window dd {
+  font-size: 11px;
+}
+
 .controls h1 {
   margin: 0 0 4px;
   font-size: 18px;
@@ -82,4 +149,13 @@ body {
   padding: 6px 12px;
   border-radius: 6px;
   z-index: 10;
+}
+
+@media (max-width: 900px) {
+  .summary-overlay {
+    top: auto;
+    right: 12px;
+    bottom: 52px;
+    width: calc(100vw - 24px);
+  }
 }
