@@ -1,80 +1,186 @@
-.p-panel {
+/* Cesium container fills the page */
+.cesium-host {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Overlay sits above the globe and ignores clicks except on controls */
+.overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  font-family: system-ui, sans-serif;
+  color: #e8e8f0;
+}
+
+.overlay button,
+.overlay input,
+.overlay label {
+  pointer-events: auto;
+}
+
+/* Left-hand control column */
+.controls {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 280px;
+  height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
-  width: 100%;
-  align-items: flex-start;
+  overflow: hidden; /* the inner scroll panel handles scrolling */
+  padding: 16px;
+  background: rgba(10, 12, 20, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+}
+.controls h1 {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
 }
 
-.p-panel-content {
+.controls p {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.landing {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  overflow: hidden;
 }
 
-.p-panel,
-.p-panel-header,
-.p-panel-content {
-  padding: 0.75rem !important;
+.moon {
+  flex: 0 0 auto;
+  height: auto;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.p-panel > *,
-.p-inputtext,
-.p-scrollpanel-content {
-  width: 100%;
+.side-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.p-inputtext {
-  padding: 0.5rem !important;
+/* Button rows */
+.row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.row > button {
+  flex: 1;
+}
+
+button {
+  padding: 6px 10px;
+  font: inherit;
+  color: #e8e8f0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* Bottom navigation */
+.nav {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.panel-header {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
 }
 
 .title {
-  font-size: 2em;
-  font-weight: bold;
+  margin: 12px 0 4px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
 }
 
-.slider-input {
+/* Sliders */
+.slider {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.slider-label {
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
 }
 
-.p-scrollpanel {
-  margin-top: 1rem;
+.slider-value {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
 }
 
-.p-scrollpanel-content {
-  padding: 0 0.75rem 2rem 0;
-  gap: 0.5rem;
-  display: flex;
-  flex-direction: column;
+.slider input[type="range"] {
+  width: 100%;
+  accent-color: #7aa7ff;
+  cursor: pointer;
 }
 
-.p-panel {
-  padding: 1rem !important;
+/* Landing site list */
+.scroll-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 8px;
+  padding-right: 4px;
 }
 
-.p-card .p-card-title {
-  font-size: 1rem;
-  font-weight: bold;
+.card {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
 }
 
-.p-card {
-  border: 1px solid #fbbf24;
+.card-title {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
 }
 
-.p-card .p-card-body {
-  padding: 0.75rem;
+.card p {
+  font-size: 0.8rem;
+  opacity: 0.8;
 }
 
-.p-card .p-card-content {
-  padding: 0;
+.add-button {
+  margin-top: 6px;
+  width: 100%;
 }
 
-/* Nasconde la scrollbar nativa del contenitore, mantenendo lo scroll funzionante */
-.p-scrollpanel-content {
-  scrollbar-width: none; /* Firefox */
-}
-
-.p-scrollpanel-content::-webkit-scrollbar {
-  display: none; /* Chrome, Edge, Safari */
+.moon .small-subtext {
+  font-size: 0.7em;
+  color: grey;
+  margin: 0.2rem 0;
 }
