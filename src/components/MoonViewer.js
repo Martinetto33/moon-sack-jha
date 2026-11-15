@@ -84,35 +84,44 @@ export default function MoonViewer() {
       viewer.clock.multiplier = 1;
       viewer.clock.shouldAnimate = true;
 
-      // Earth orbiting the Moon, with its real orientation. It is a Primitive
-      // moved through its modelMatrix: a moving ellipsoid entity renders white
-      // in Cesium 1.147, because its image material is recreated every frame.
-      const earthAppearance = new Cesium.MaterialAppearance({
-        material: Cesium.Material.fromType("Image", {
-          image: `${BASE}/textures/earth-texture.jpg`,
-        }),
-        closed: true,
-      });
+      // Earth orbiting the Moon, with its real orientation, and a stand-in
+      // for the Moon drawn around the globe when it would look too small.
+      // Both are enlarged so they never look smaller than MIN_SCREEN_RADIUS.
       const earth = viewer.scene.primitives.add(
-        new Cesium.Primitive({
-          geometryInstances: new Cesium.GeometryInstance({
-            geometry: new Cesium.EllipsoidGeometry({
-              radii: new Cesium.Cartesian3(
-                EARTH_RADIUS,
-                EARTH_RADIUS,
-                EARTH_RADIUS,
-              ),
-              vertexFormat: earthAppearance.vertexFormat,
-            }),
-          }),
-          appearance: earthAppearance,
-        }),
+        texturedSphere(Cesium, EARTH_RADIUS, `${BASE}/textures/earth-texture.jpg`),
+      );
+      const moonStandIn = viewer.scene.primitives.add(
+        texturedSphere(
+          Cesium,
+          MOON_RADIUS,
+          `${BASE}/textures/moon.jpg`,
+          SUNLIT_SPHERE_FS,
+        ),
       );
       viewer.scene.preUpdate.addEventListener((_, time) => {
-        earth.modelMatrix = Cesium.Matrix4.fromRotationTranslation(
-          getEarthOrientation(Cesium, time),
-          getEarthPosition(Cesium, time),
+        const earthPosition = getEarthPosition(Cesium, time);
+        earth.modelMatrix = Cesium.Matrix4.multiplyByScale(
+          Cesium.Matrix4.fromRotationTranslation(
+            getEarthOrientation(Cesium, time),
+            earthPosition,
+            earth.modelMatrix,
+          ),
+          sphereScale(
+            Cesium,
+            minimumScale(Cesium, viewer, earthPosition, EARTH_RADIUS),
+          ),
           earth.modelMatrix,
+        );
+        const moonScale = minimumScale(
+          Cesium,
+          viewer,
+          Cesium.Cartesian3.ZERO,
+          MOON_RADIUS,
+        );
+        moonStandIn.show = moonScale > 1;
+        moonStandIn.modelMatrix = Cesium.Matrix4.fromScale(
+          sphereScale(Cesium, moonScale),
+          moonStandIn.modelMatrix,
         );
       });
 
@@ -267,6 +276,68 @@ function getEarthOrientation(Cesium, time) {
   );
 }
 
+// Earth and Moon never look smaller than this fraction of the view height.
+const MIN_SCREEN_RADIUS = 0.04;
+
+/** Scale that keeps a sphere at least MIN_SCREEN_RADIUS of the view height. */
+function minimumScale(Cesium, viewer, centre, radius) {
+  const { camera } = viewer;
+  const distance = Cesium.Cartesian3.distance(camera.positionWC, centre);
+  const minimumRadius =
+    MIN_SCREEN_RADIUS * 2 * Math.tan(camera.frustum.fovy / 2) * distance;
+  return Math.max(1, minimumRadius / radius);
+}
+
+/**
+ * Scale for a texturedSphere, with a half turn around its axis: EllipsoidGeometry
+ * puts longitude 0 at the edge of the texture, standard maps have it in the middle.
+ */
+function sphereScale(Cesium, scale) {
+  return new Cesium.Cartesian3(-scale, -scale, scale);
+}
+
+/**
+ * A textured sphere placed each frame through its modelMatrix: a moving
+ * ellipsoid entity renders white in Cesium 1.147, because its image material
+ * is recreated every frame.
+ */
+function texturedSphere(Cesium, radius, image, fragmentShaderSource) {
+  const appearance = new Cesium.MaterialAppearance({
+    material: Cesium.Material.fromType("Image", { image }),
+    fragmentShaderSource,
+    closed: true,
+  });
+  return new Cesium.Primitive({
+    geometryInstances: new Cesium.GeometryInstance({
+      geometry: new Cesium.EllipsoidGeometry({
+        radii: new Cesium.Cartesian3(radius, radius, radius),
+        vertexFormat: appearance.vertexFormat,
+      }),
+    }),
+    appearance,
+  });
+}
+
+// Lit by the Sun like the globe seen from afar (Cesium's GlobeFS), so the
+// Moon looks the same when its stand-in takes over.
+const SUNLIT_SPHERE_FS = `
+in vec3 v_positionEC;
+in vec3 v_normalEC;
+in vec2 v_st;
+
+void main()
+{
+    czm_materialInput materialInput;
+    materialInput.normalEC = normalize(v_normalEC);
+    materialInput.positionToEyeEC = -v_positionEC;
+    materialInput.st = v_st;
+    czm_material material = czm_getMaterial(materialInput);
+    float light = clamp(czm_getLambertDiffuse(czm_lightDirectionEC, materialInput.normalEC) * 5.0 + 0.3, 0.0, 1.0);
+    // moon.jpg is about twice as bright as the WAC mosaic on the globe.
+    out_FragColor = vec4(material.diffuse * 0.46 * czm_lightColor * light, material.alpha);
+}
+`;
+
 /** Distance at which a sphere of `radius` fits the narrower field of view. */
 function fitDistance(viewer, radius) {
   const { fovy, aspectRatio } = viewer.camera.frustum;
@@ -302,10 +373,10 @@ function flyToSystem(Cesium, viewer, duration = 2) {
     0.5,
     new Cartesian3(),
   );
-  const distance = fitDistance(
-    viewer,
-    Cartesian3.magnitude(centre) + EARTH_RADIUS,
-  );
+  // Leave room at the edge for the Earth, enlarged to MIN_SCREEN_RADIUS.
+  const distance =
+    fitDistance(viewer, Cartesian3.magnitude(centre)) /
+    (1 - (2 * MIN_SCREEN_RADIUS) / Math.min(1, aspectRatio));
   viewer.camera.flyTo({
     destination: Cartesian3.subtract(
       centre,
