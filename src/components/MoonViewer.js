@@ -222,7 +222,6 @@ export default function MoonViewer() {
       flyToSystem(Cesium, viewer, 0);
     })().catch((err) => {
       console.error(err);
-      setStatus("Failed to load Cesium. Check the console.");
     });
 
     return () => {
@@ -266,7 +265,6 @@ export default function MoonViewer() {
     withViewer((Cesium, viewer) => {
       const time = viewer.clock.currentTime;
       const visible = lookAt(Cesium, viewer, getPosition(Cesium, time));
-      setStatus(visible ? "" : `The ${name} is below the horizon from here.`);
     });
   };
   const loadSummaryForSite = async (longitude, latitude, siteName) => {

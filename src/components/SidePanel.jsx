@@ -13,7 +13,6 @@ export default function SidePanel({
 }) {
   // Every site from the loaded GeoJSON files.
   const [landingSites, setLandingSites] = useState([]);
-  const [status, setStatus] = useState("");
   const fileInputRef = useRef(null);
 
   // Caricamento automatico dei file base allo start
@@ -29,7 +28,7 @@ export default function SidePanel({
           const name = path.split("/").pop();
           loaded.push(...parseLandingSites(await res.text(), name));
         } catch (err) {
-          if (!cancelled) setStatus(`Could not read ${path}: ${err.message}.`);
+          throw err;
         }
       }
       if (!cancelled) setLandingSites(loaded);
@@ -52,26 +51,22 @@ export default function SidePanel({
           ...current.filter((site) => site.source !== file.name),
           ...sites,
         ]);
-        setStatus(`Added ${sites.length} landing sites from ${file.name}.`);
       } catch (err) {
-        setStatus(`Could not read ${file.name}: ${err.message}.`);
+        throw err;
       }
     }
   };
 
   const addSiteToViewer = (site) => {
     if (simulationSites.some((s) => s.id === site.id)) {
-      setStatus(`${site.name} is already in the simulation.`);
       return;
     }
     setSimulationSites((current) => [...current, site]);
-    setStatus(`Added ${site.name} to the simulation.`);
   };
 
   const focusSite = (site) => {
     const [lon, lat] = representativePoint(site.geometry.coordinates);
     onFocusSite(lon, lat, site.name);
-    setStatus(`Flying to ${site.name}.`);
   };
 
   return (
