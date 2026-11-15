@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "primereact/button";
 import { ClockRange } from "cesium";
+import DatePicker from "./DatePicker.js"
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const MOON_RADIUS = 1737400; // meters
@@ -18,6 +19,7 @@ export default function MoonViewer() {
   const cesiumRef = useRef(null);
   const [status, setStatus] = useState("Initializing Cesium…");
   const [paused, setPaused] = useState(false);
+  const [viewer, setViewer] = useState(null);
 
   useEffect(() => {
     let disposed = false;
@@ -63,6 +65,7 @@ export default function MoonViewer() {
         selectionIndicator: false,
       });
       viewerRef.current = viewer;
+      setViewer(viewer)
 
       // LROC WAC global mosaic, ~100 m/pixel (same basemap as QuickMap).
       viewer.imageryLayers.addImageryProvider(
@@ -178,6 +181,7 @@ export default function MoonViewer() {
 
     return () => {
       disposed = true;
+      setViewer(null);
       viewerRef.current?.destroy();
       viewerRef.current = null;
     };
@@ -251,14 +255,14 @@ export default function MoonViewer() {
             ⟲ Now
           </button>
         </div>
-
+        
         <div className="row">
           <button onClick={() => setSpeed(1)}>1×</button>
           <button onClick={() => setSpeed(3600)}>1 h/s</button>
           <button onClick={() => setSpeed(86400)}>1 d/s</button>
         </div>
       </div>
-
+      <DatePicker viewer={viewer} />
       <div className="status">{status}</div>
     </>
   );
