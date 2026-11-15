@@ -1,4 +1,6 @@
-import { MoonDataDTO, TargetPlanet } from "./MoonData";
+import { MoonDataDTO } from "./MoonData.js";
+
+/** @typedef {import("./MoonData.js").TargetPlanet} TargetPlanet */
 
 // https://ssd-api.jpl.nasa.gov/doc/horizons.html#stepping
 export const TIME_UNITS = Object.freeze({
@@ -35,8 +37,46 @@ export function buildUrl(target, latitude, longitude, startTime, stopTime, stepU
     return `${API}?${p}`;
 }
 
+/**
+ * @param {TargetPlanet} target
+ * @param {number} latitude
+ * @param {number} longitude
+ * @param {Date} [selectedTime] Start of the default two-month window; defaults to now
+ * @returns {string}
+ */
+export function buildUrlWithTwoMonthFrame(
+    target,
+    latitude,
+    longitude,
+    selectedTime = new Date(),
+) {
+    const stopTime = addUtcMonths(selectedTime, 2);
+    return buildUrl(
+        target,
+        latitude,
+        longitude,
+        selectedTime,
+        stopTime,
+        TIME_UNITS.HOUR,
+        1,
+    );
+}
+
+function addUtcMonths(date, months) {
+    const result = new Date(date);
+    const day = result.getUTCDate();
+    result.setUTCDate(1);
+    result.setUTCMonth(result.getUTCMonth() + months);
+    const lastDay = new Date(
+        Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0),
+    ).getUTCDate();
+    result.setUTCDate(Math.min(day, lastDay));
+    return result;
+}
+
 /** 
- * Returns data for the specified time window, at the specified stepping rate.
+ * Returns data for either the default two-month hourly window or an explicit
+ * time window and stepping rate.
  * The input data is interpreted as follows:
  * - target: either the Earth as seen from the Moon or the Sun as seen from the Moon
  * - latitude and longitude represent a landing site on the moon
@@ -49,14 +89,55 @@ export function buildUrl(target, latitude, longitude, startTime, stopTime, stepU
  * @param {TargetPlanet} target the target for which to fetch data
  * @param {number} latitude the latitude on the Moon
  * @param {number} longitude the longitude on the Moon
- * @param {Date} startTime the start window for which to fetch data
- * @param {Date} stopTime the end window for which to fetch data
- * @param {TimeUnit} stepUnit the stepping unit (e.g., day, month, year...)  
- * @param {number} step the step amount (e.g., 1, 2, 3...)
+ * @param {Date} [startTime] Selected time for the default window, or explicit window start
+ * @param {Date} [stopTime] Explicit window end
+ * @param {TimeUnit} [stepUnit] Explicit stepping unit
+ * @param {number} [step] Explicit step amount
  * @returns {Promise<MoonDataDTO[]>} 
  * */
-export async function getForLatAndLong(target, latitude, longitude, startTime, stopTime, stepUnit, step) {
-    const response = await fetch(buildUrl(target, latitude, longitude, startTime, stopTime, stepUnit, step));
+export async function getForLatAndLong(
+    target,
+    latitude,
+    longitude,
+    startTime,
+    stopTime,
+    stepUnit,
+    step,
+) {
+    const hasExplicitWindow =
+        stopTime !== undefined || stepUnit !== undefined || step !== undefined;
+    let url;
+
+    if (hasExplicitWindow) {
+        if (
+            startTime === undefined ||
+            stopTime === undefined ||
+            stepUnit === undefined ||
+            step === undefined
+        ) {
+            throw new TypeError(
+                "Explicit requests require startTime, stopTime, stepUnit, and step",
+            );
+        }
+        url = buildUrl(
+            target,
+            latitude,
+            longitude,
+            startTime,
+            stopTime,
+            stepUnit,
+            step,
+        );
+    } else {
+        url = buildUrlWithTwoMonthFrame(
+            target,
+            latitude,
+            longitude,
+            startTime,
+        );
+    }
+
+    const response = await fetch(url);
     const text = await response.text();
     if (!response.ok) throw new Error(`Horizons HTTP ${response.status}: ${text.slice(0, 300)}`);
     return parseHorizonsRows(text, target);   // let errors propagate

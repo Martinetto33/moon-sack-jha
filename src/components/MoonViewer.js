@@ -1,9 +1,14 @@
 "use client";
+import * as Cesium from "cesium";
 
-import { useEffect, useRef, useState } from "react";
-import { Button } from "primereact/button";
-import { ClockRange } from "cesium";
-import DatePicker from "./DatePicker.js"
+import { useEffect, useMemo, useRef, useState } from "react";
+import SummaryPanel from "./SummaryPanel";
+import { MoonDataDTO, TARGET_PLANETS } from "../app/api/MoonData.js";
+import { SummaryCreator } from "../app/api/Summary.js";
+import { parseLandingSites } from "./landingSites";
+import SidePanel from "./SidePanel";
+import SimulationSites from "./SimulationSites";
+import "../resources/css/main.css";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const MOON_RADIUS = 1737400; // meters
@@ -17,9 +22,14 @@ export default function MoonViewer() {
   const hostRef = useRef(null);
   const viewerRef = useRef(null);
   const cesiumRef = useRef(null);
-  const [status, setStatus] = useState("Initializing Cesium…");
   const [paused, setPaused] = useState(false);
+  const [onSurface, setOnSurface] = useState(false);
   const [viewer, setViewer] = useState(null);
+  const [simulationSites, setSimulationSites] = useState([]);
+  // Every site from the loaded GeoJSON files (see parseLandingSites).
+  const [landingSites, setLandingSites] = useState([]);
+  const fileInputRef = useRef(null);
+  const summary = useMemo(createMockSummary, []);
 
   useEffect(() => {
     let disposed = false;
@@ -38,6 +48,17 @@ export default function MoonViewer() {
         date,
         result,
       ) => icrfToMoonFixed(Cesium, date, result);
+      // Cesium culls what is behind a sphere at the lowest loaded terrain, and
+      // everything when the camera is inside it. Standing in a crater can be
+      // below it, which hid the Earth and the Sun: the ground still hides them.
+      // shortcut: reads Occluder's private _horizonDistance, its "camera inside" flag; recheck on Cesium upgrades.
+      const isVisible = Cesium.Occluder.prototype.isBoundingSphereVisible;
+      Cesium.Occluder.prototype.isBoundingSphereVisible = function (sphere) {
+        return (
+          this._horizonDistance === Number.MAX_VALUE ||
+          isVisible.call(this, sphere)
+        );
+      };
 
       const viewer = new Cesium.Viewer(hostRef.current, {
         globe: new Cesium.Globe(Cesium.Ellipsoid.MOON),
@@ -76,7 +97,8 @@ export default function MoonViewer() {
           tileMatrixSetID: "default028mm",
           tilingScheme: new Cesium.GeographicTilingScheme(),
           maximumLevel: 8,
-          credit: "LROC WAC mosaic: NASA/GSFC/Arizona State University, via NASA Moon Trek",
+          credit:
+            "LROC WAC mosaic: NASA/GSFC/Arizona State University, via NASA Moon Trek",
         }),
       );
 
@@ -94,7 +116,11 @@ export default function MoonViewer() {
       // for the Moon drawn around the globe when it would look too small.
       // Both are enlarged so they never look smaller than MIN_SCREEN_RADIUS.
       const earth = viewer.scene.primitives.add(
-        texturedSphere(Cesium, EARTH_RADIUS, `${BASE}/textures/earth-texture.jpg`),
+        texturedSphere(
+          Cesium,
+          EARTH_RADIUS,
+          `${BASE}/textures/earth-texture.jpg`,
+        ),
       );
       const moonStandIn = viewer.scene.primitives.add(
         texturedSphere(
@@ -137,7 +163,9 @@ export default function MoonViewer() {
       input.setInputAction((click) => {
         const ray = viewer.camera.getPickRay(click.position);
         const position = ray && viewer.scene.globe.pick(ray, viewer.scene);
-        if (position) standOn(Cesium, viewer, position);
+        if (position) {
+          standOn(Cesium, viewer, position).then(() => setOnSurface(true));
+        }
       }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
       // While standing, dragging turns the view and keeps the horizon level.
@@ -151,17 +179,18 @@ export default function MoonViewer() {
       input.setInputAction((move) => {
         if (!dragFrom || !isStanding(viewer)) return;
         const camera = viewer.camera;
-        const radiansPerPixel = camera.frustum.fovy / viewer.canvas.clientHeight;
-        const maxPitch = Cesium.Math.toRadians(85);
+        const radiansPerPixel =
+          camera.frustum.fovy / viewer.canvas.clientHeight;
         camera.setView({
           orientation: {
             heading:
               camera.heading -
               (move.endPosition.x - dragFrom.x) * radiansPerPixel,
             pitch: Cesium.Math.clamp(
-              camera.pitch + (move.endPosition.y - dragFrom.y) * radiansPerPixel,
-              -maxPitch,
-              maxPitch,
+              camera.pitch +
+                (move.endPosition.y - dragFrom.y) * radiansPerPixel,
+              -MAX_PITCH,
+              MAX_PITCH,
             ),
             roll: 0,
           },
@@ -170,10 +199,8 @@ export default function MoonViewer() {
       }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
       // Start with the Sun, the Earth and the Moon in view.
+      setViewer(viewer);
       flyToSystem(Cesium, viewer, 0);
-      setStatus(
-        "Drag to rotate · scroll to zoom · right-drag to tilt · double-click the Moon to stand on it",
-      );
     })().catch((err) => {
       console.error(err);
       setStatus("Failed to load Cesium. Check the console.");
@@ -184,6 +211,7 @@ export default function MoonViewer() {
       setViewer(null);
       viewerRef.current?.destroy();
       viewerRef.current = null;
+      setViewer(null);
     };
   }, []);
 
@@ -208,64 +236,180 @@ export default function MoonViewer() {
     });
   };
 
+  // The presets leave the surface.
+  const goTo = (fly) => {
+    withViewer(fly);
+    setOnSurface(false);
+  };
+
+  const look = (getPosition, name) => {
+    withViewer((Cesium, viewer) => {
+      const time = viewer.clock.currentTime;
+      const visible = lookAt(Cesium, viewer, getPosition(Cesium, time));
+      setStatus(visible ? "" : `The ${name} is below the horizon from here.`);
+    });
+  };
+  const focusOnSite = (lon, lat) => {
+    const cartographic = Cesium.Cartographic.fromDegrees(lon, lat, 0);
+    const worldPosition =
+      Cesium.Ellipsoid.MOON.cartographicToCartesian(cartographic);
+
+    setStanding(viewer, false); // re-enable camera controls if the user is standing
+
+    viewer.camera.flyToBoundingSphere(
+      new Cesium.BoundingSphere(worldPosition, 0),
+      {
+        duration: 3.5,
+        offset: new Cesium.HeadingPitchRange(0, -Math.PI / 3, 50000),
+      },
+    );
+  };
+
+  let isSummaryRendered = true; // TODO: toggle based on camera state (set to true when camera is on Moon surface)
+
   return (
     <>
-      <div ref={hostRef} className="cesium-host" />
+      <div ref={hostRef} className="cesium-host">
+        <div className="cesium-overlay-layer">
+          <SummaryPanel isRendered={isSummaryRendered} summary={summary} />
+        </div>
+      </div>
+      <SimulationSites viewer={viewer} sites={simulationSites} />
 
-      <div className="controls">
-        <h1>🌕 Moon</h1>
-        <p>Real-time lunar position computed with Cesium.</p>
+      <div className="overlay">
+        <div className="controls">
+          <div className="landing">
+            <SidePanel
+              simulationSites={simulationSites}
+              setSimulationSites={setSimulationSites}
+              onFocusSite={focusOnSite}
+            />
+          </div>
+          <div className="moon">
+            <h1>🌕 Moon</h1>
+            <p className="small-subtext">
+              Drag to rotate, scroll to zoom, shift+drag to pan, double-click
+              the Moon to stand on it
+            </p>
+            <p>Real-time lunar position computed with Cesium.</p>
 
-        <button onClick={() => withViewer((C, v) => flyToSystem(C, v))}>
-          ☀️ Sun, Earth &amp; Moon
-        </button>
-        <button onClick={() => withViewer((C, v) => flyToMoon(C, v))}>
-          🌕 Moon close-up
-        </button>
-        {/* Example PrimeReact Button */}
-        {/* <Button
-          label="Random location"
-          icon="pi pi-map-marker"
-          onClick={() =>
-            withViewer((C, v) => {
-              const longitude = Math.random() * 360 - 180;
-              const latitude =
-                (Math.asin(Math.random() * 2 - 1) * 180) / Math.PI;
-              standOn(
-                C,
-                v,
-                C.Cartesian3.fromDegrees(
-                  longitude,
-                  latitude,
-                  0,
-                  C.Ellipsoid.MOON,
-                ),
-              );
-            })
-          }
-        /> */}
+            <div className="row">
+              <button onClick={togglePlay}>
+                {paused ? "▶ Play" : "⏸ Pause"}
+              </button>
+              <button
+                onClick={() =>
+                  withViewer(
+                    (C, v) => (v.clock.currentTime = C.JulianDate.now()),
+                  )
+                }
+              >
+                ⟲ Now
+              </button>
+            </div>
 
-        <div className="row">
-          <button onClick={togglePlay}>{paused ? "▶ Play" : "⏸ Pause"}</button>
-          <button
-            onClick={() =>
-              withViewer((C, v) => (v.clock.currentTime = C.JulianDate.now()))
-            }
-          >
-            ⟲ Now
+            <div className="row">
+              <button onClick={() => setSpeed(1)}>1×</button>
+              <button onClick={() => setSpeed(3600)}>1 h/s</button>
+              <button onClick={() => setSpeed(86400)}>1 d/s</button>
+            </div>
+          </div>
+        </div>
+
+        <nav className="nav">
+          <button onClick={() => goTo(flyToSystem)}>
+            ☀️ Sun, Earth &amp; Moon
           </button>
-        </div>
-        
-        <div className="row">
-          <button onClick={() => setSpeed(1)}>1×</button>
-          <button onClick={() => setSpeed(3600)}>1 h/s</button>
-          <button onClick={() => setSpeed(86400)}>1 d/s</button>
-        </div>
+          <button onClick={() => goTo(flyToMoon)}>🌕 Moon close-up</button>
+          {onSurface && (
+            <>
+              <button onClick={() => look(getEarthPosition, "Earth")}>
+                🌍 Look at Earth
+              </button>
+              <button onClick={() => look(getSunPosition, "Sun")}>
+                ☀️ Look at Sun
+              </button>
+            </>
+          )}
+        </nav>
       </div>
       <DatePicker viewer={viewer} />
       <div className="status">{status}</div>
     </>
   );
+}
+
+function createMockSummary() {
+  const selectedTime = new Date();
+  const samples = [
+    {
+      hours: -12,
+      earthAzimuth: 20,
+      earthElevation: -25,
+      sunAzimuth: 300,
+      sunElevation: 18,
+    },
+    {
+      hours: -6,
+      earthAzimuth: 80,
+      earthElevation: -8,
+      sunAzimuth: 340,
+      sunElevation: 42,
+    },
+    {
+      hours: 0,
+      earthAzimuth: 145,
+      earthElevation: 12,
+      sunAzimuth: 20,
+      sunElevation: 55,
+    },
+    {
+      hours: 6,
+      earthAzimuth: 220,
+      earthElevation: 24,
+      sunAzimuth: 60,
+      sunElevation: 28,
+    },
+    {
+      hours: 12,
+      earthAzimuth: 300,
+      earthElevation: -15,
+      sunAzimuth: 100,
+      sunElevation: -10,
+    },
+  ];
+  const toMoonData = (target, azimuthKey, elevationKey) =>
+    samples.map(({ hours, ...sample }) => {
+      const time = new Date(selectedTime.getTime() + hours * 60 * 60 * 1000);
+      return new MoonDataDTO(
+        target,
+        time,
+        sample[azimuthKey],
+        sample[elevationKey],
+        false,
+        false,
+      );
+    });
+  const startTime = new Date(selectedTime.getTime() - 12 * 60 * 60 * 1000);
+  const endTime = new Date(selectedTime.getTime() + 12 * 60 * 60 * 1000);
+  const creator = new SummaryCreator({
+    latitude: 0.674,
+    longitude: 23.473,
+    startTime,
+    endTime,
+    moonToEarthDTOs: toMoonData(
+      TARGET_PLANETS.EARTH,
+      "earthAzimuth",
+      "earthElevation",
+    ),
+    moonToSunDTOs: toMoonData(TARGET_PLANETS.SUN, "sunAzimuth", "sunElevation"),
+    wantedTargets: {
+      earth: { elevation: 15, azimuth: 180 },
+      sun: { elevation: 45, azimuth: 0 },
+    },
+  });
+
+  return creator.selectTime(selectedTime);
 }
 
 /** Rotation from ICRF to the Moon-fixed frame (IAU model). */
@@ -391,7 +535,11 @@ function flyToSystem(Cesium, viewer, duration = 2) {
     Math.sin(azimuth) * Math.cos(down),
     -Math.sin(down),
   );
-  const right = Cartesian3.cross(direction, Cartesian3.UNIT_Z, new Cartesian3());
+  const right = Cartesian3.cross(
+    direction,
+    Cartesian3.UNIT_Z,
+    new Cartesian3(),
+  );
   const up = Cartesian3.normalize(
     Cartesian3.cross(right, direction, right),
     right,
@@ -441,24 +589,79 @@ function flyToMoon(Cesium, viewer) {
 }
 
 const EYE_HEIGHT = 2; // meters above the ground when standing
+const MAX_PITCH = (85 * Math.PI) / 180; // how far the standing camera looks up or down
+const DOWNHILL_DISTANCE = 500; // meters: where standOn compares the ground around
 
-/** Preset 3: stand on the Moon at `position`, free to look around. */
+/** Preset 3: stand on the Moon at `position`, facing downhill, free to look around. */
 async function standOn(Cesium, viewer, position) {
   const point = Cesium.Cartographic.fromCartesian(position);
   const pickedHeight = point.height;
+  // Ground in 8 directions around the point: facing uphill, the slope fills the view.
+  const enu = Cesium.Transforms.eastNorthUpToFixedFrame(position);
+  const around = Array.from({ length: 8 }, (_, i) => {
+    const heading = (i * Math.PI) / 4;
+    const offset = new Cesium.Cartesian3(
+      DOWNHILL_DISTANCE * Math.sin(heading),
+      DOWNHILL_DISTANCE * Math.cos(heading),
+      0,
+    );
+    return Cesium.Cartographic.fromCartesian(
+      Cesium.Matrix4.multiplyByPoint(enu, offset, offset),
+    );
+  });
   // The pick used the coarse tiles of the current view: ask for the finest.
-  await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [point]).catch(
-    () => {},
-  );
+  await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [
+    point,
+    ...around,
+  ]).catch(() => {});
   if (viewer.isDestroyed()) return;
   point.height = (point.height ?? pickedHeight) + EYE_HEIGHT;
+
+  let heading = viewer.camera.heading;
+  let lowest = Infinity;
+  around.forEach((ground, i) => {
+    if (ground.height < lowest) {
+      lowest = ground.height;
+      heading = (i * Math.PI) / 4;
+    }
+  });
 
   setStanding(viewer, true);
   viewer.camera.flyTo({
     destination: Cesium.Cartographic.toCartesian(point),
-    orientation: { heading: viewer.camera.heading, pitch: 0, roll: 0 },
+    orientation: { heading, pitch: 0, roll: 0 },
     duration: 2,
   });
+}
+
+/** Turns the standing camera towards `target`; false if it is below the horizon. */
+function lookAt(Cesium, viewer, target) {
+  const { Cartesian3, Matrix4 } = Cesium;
+  const position = Cartesian3.clone(viewer.camera.positionWC);
+  const toLocal = Matrix4.inverseTransformation(
+    Cesium.Transforms.eastNorthUpToFixedFrame(position),
+    new Matrix4(),
+  );
+  const local = Cartesian3.normalize(
+    Matrix4.multiplyByPointAsVector(
+      toLocal,
+      Cartesian3.subtract(target, position, new Cartesian3()),
+      new Cartesian3(),
+    ),
+    new Cartesian3(),
+  );
+  const pitch = Math.asin(local.z);
+  viewer.camera.flyTo({
+    destination: position,
+    orientation: {
+      heading: Math.atan2(local.x, local.y),
+      // Below the horizon: face its direction, looking straight ahead.
+      pitch: Cesium.Math.clamp(pitch, 0, MAX_PITCH),
+      roll: 0,
+    },
+    duration: 1,
+  });
+  return pitch > 0;
 }
 
 /** Standing turns off Cesium's camera controls; the drag handler turns the view instead. */
