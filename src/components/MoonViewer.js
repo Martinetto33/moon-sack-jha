@@ -1,4 +1,5 @@
 "use client";
+import * as Cesium from "cesium";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import SummaryPanel from "./SummaryPanel";
@@ -6,6 +7,7 @@ import { MoonDataDTO, TARGET_PLANETS } from "../app/api/MoonData.js";
 import { SummaryCreator } from "../app/api/Summary.js";
 import { parseLandingSites } from "./landingSites";
 import SidePanel from "./SidePanel";
+import SimulationSites from "./SimulationSites";
 import "../resources/css/main.css";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -25,6 +27,8 @@ export default function MoonViewer() {
   const [status, setStatus] = useState("Initializing Cesium…");
   const [paused, setPaused] = useState(false);
   const [onSurface, setOnSurface] = useState(false);
+  const [viewer, setViewer] = useState(null);
+  const [simulationSites, setSimulationSites] = useState([]);
   // Every site from the loaded GeoJSON files (see parseLandingSites).
   const [landingSites, setLandingSites] = useState([]);
   const fileInputRef = useRef(null);
@@ -196,6 +200,7 @@ export default function MoonViewer() {
       }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
       // Start with the Sun, the Earth and the Moon in view.
+      setViewer(viewer);
       flyToSystem(Cesium, viewer, 0);
       setStatus(HELP);
     })().catch((err) => {
@@ -207,6 +212,7 @@ export default function MoonViewer() {
       disposed = true;
       viewerRef.current?.destroy();
       viewerRef.current = null;
+      setViewer(null);
     };
   }, []);
 
@@ -231,24 +237,6 @@ export default function MoonViewer() {
     });
   };
 
-  const addLandingSites = async (event) => {
-    const files = [...event.target.files];
-    event.target.value = ""; // so the same file can be picked again
-    for (const file of files) {
-      try {
-        const sites = parseLandingSites(await file.text(), file.name);
-        // Adding a file again replaces its sites.
-        setLandingSites((current) => [
-          ...current.filter((site) => site.source !== file.name),
-          ...sites,
-        ]);
-        setStatus(`Added ${sites.length} landing sites from ${file.name}.`);
-      } catch (err) {
-        setStatus(`Could not read ${file.name}: ${err.message}.`);
-      }
-    }
-  };
-
   // The presets leave the surface.
   const goTo = (fly) => {
     withViewer(fly);
@@ -263,6 +251,21 @@ export default function MoonViewer() {
       setStatus(visible ? HELP : `The ${name} is below the horizon from here.`);
     });
   };
+  const focusOnSite = (lon, lat) => {
+    const cartographic = Cesium.Cartographic.fromDegrees(lon, lat, 0);
+    const worldPosition =
+      Cesium.Ellipsoid.MOON.cartographicToCartesian(cartographic);
+
+    setStanding(viewer, false); // re-enable camera controls if the user is standing
+
+    viewer.camera.flyToBoundingSphere(
+      new Cesium.BoundingSphere(worldPosition, 0),
+      {
+        duration: 3.5,
+        offset: new Cesium.HeadingPitchRange(0, -Math.PI / 3, 50000),
+      },
+    );
+  };
 
   let isSummaryRendered = true; // TODO: toggle based on camera state (set to true when camera is on Moon surface)
 
@@ -273,43 +276,46 @@ export default function MoonViewer() {
           <SummaryPanel isRendered={isSummaryRendered} summary={summary} />
         </div>
       </div>
+      <SimulationSites viewer={viewer} sites={simulationSites} />
 
       <div className="overlay">
         <div className="controls">
-          <SidePanel className="panel"></SidePanel>
-          <h1>🌕 Moon</h1>
-          <p>Real-time lunar position computed with Cesium.</p>
-
-          <div className="row">
-            <button onClick={togglePlay}>
-              {paused ? "▶ Play" : "⏸ Pause"}
-            </button>
-            <button
-              onClick={() =>
-                withViewer((C, v) => (v.clock.currentTime = C.JulianDate.now()))
-              }
-            >
-              ⟲ Now
-            </button>
+          <div className="landing">
+            <SidePanel
+              simulationSites={simulationSites}
+              setSimulationSites={setSimulationSites}
+              onFocusSite={focusOnSite}
+            />
           </div>
+          <div className="moon">
+            <h1>🌕 Moon</h1>
+            <p className="small-subtext">
+              Drag to rotate, scroll to zoom, right-drag to tilt, double-click
+              the Moon to stand on it
+            </p>
+            <p>Real-time lunar position computed with Cesium.</p>
 
-          <div className="row">
-            <button onClick={() => setSpeed(1)}>1×</button>
-            <button onClick={() => setSpeed(3600)}>1 h/s</button>
-            <button onClick={() => setSpeed(86400)}>1 d/s</button>
+            <div className="row">
+              <button onClick={togglePlay}>
+                {paused ? "▶ Play" : "⏸ Pause"}
+              </button>
+              <button
+                onClick={() =>
+                  withViewer(
+                    (C, v) => (v.clock.currentTime = C.JulianDate.now()),
+                  )
+                }
+              >
+                ⟲ Now
+              </button>
+            </div>
+
+            <div className="row">
+              <button onClick={() => setSpeed(1)}>1×</button>
+              <button onClick={() => setSpeed(3600)}>1 h/s</button>
+              <button onClick={() => setSpeed(86400)}>1 d/s</button>
+            </div>
           </div>
-
-          <button onClick={() => fileInputRef.current.click()}>
-            ➕ Add landing site
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".geojson,.json,application/geo+json,application/json"
-            multiple
-            hidden
-            onChange={addLandingSites}
-          />
         </div>
 
         <nav className="nav">
@@ -331,7 +337,6 @@ export default function MoonViewer() {
       </div>
 
       <div className="status">{status}</div>
-
     </>
   );
 }
@@ -399,11 +404,7 @@ function createMockSummary() {
       "earthAzimuth",
       "earthElevation",
     ),
-    moonToSunDTOs: toMoonData(
-      TARGET_PLANETS.SUN,
-      "sunAzimuth",
-      "sunElevation",
-    ),
+    moonToSunDTOs: toMoonData(TARGET_PLANETS.SUN, "sunAzimuth", "sunElevation"),
     wantedTargets: {
       earth: { elevation: 15, azimuth: 180 },
       sun: { elevation: 45, azimuth: 0 },
