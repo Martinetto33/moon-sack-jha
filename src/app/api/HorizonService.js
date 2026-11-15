@@ -44,6 +44,8 @@ export function buildUrl(target, latitude, longitude, startTime, stopTime, stepU
  * @returns {string}
  */
 export function buildUrlWithTwoMonthFrame(target, latitude, longitude, selectedTime) {
+  const twoMonthsLater = new Date(date);
+  twoMonthsLater.setMonth(selectedTime.getMonth() + 2);
   const p = new URLSearchParams({
         format: "text",
         COMMAND: quoted(target.horizonsId),
@@ -53,9 +55,9 @@ export function buildUrlWithTwoMonthFrame(target, latitude, longitude, selectedT
         CENTER: quoted("coord@301"),
         COORD_TYPE: quoted("GEODETIC"),
         SITE_COORD: quoted(`${normLon(longitude)},${latitude},0`),
-        START_TIME: toHorizonsTime(selectedTime.plus),
-        STOP_TIME: toHorizonsTime(stopTime),
-        STEP_SIZE: quoted(`${step} ${stepUnit}`),
+        START_TIME: toHorizonsTime(selectedTime),
+        STOP_TIME: toHorizonsTime(twoMonthsLater),
+        STEP_SIZE: quoted(`1 h`), // 1 hour step size
         QUANTITIES: quoted("4"),
         ANG_FORMAT: quoted("DEG"),
     });
