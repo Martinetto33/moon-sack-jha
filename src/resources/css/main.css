@@ -233,6 +233,7 @@ button:hover {
   gap: 2px 4px;
   align-items: center;
   font-size: 0.8rem;
+  margin: 4px 0;
 }
 
 .grid-head {
