@@ -74,18 +74,27 @@ export default function SidePanel({
 
   return (
     <div className="side-panel">
-      <h2 className="panel-header">Landing Sites</h2>
-      <button onClick={() => fileInputRef.current.click()}>
-        ➕ Add landing site
-      </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".geojson,.json,application/geo+json,application/json"
-        multiple
-        hidden
-        onChange={addLandingSites}
-      />
+      <div className="panel-heading">
+        <h2 className="panel-header">Landing Sites</h2>
+        <button
+          className="icon-button"
+          data-tooltip="Add custom landing site"
+          aria-label="Add custom landing site"
+          onClick={() => fileInputRef.current.click()}
+        >
+          +
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".geojson,.json,application/geo+json,application/json"
+          multiple
+          hidden
+          onChange={addLandingSites}
+        />
+      </div>
+      <DirectionGrid />
+
       <div
         className="scroll-panel"
         style={{ width: "100%", height: "100%", overflowY: "auto" }}
@@ -134,4 +143,45 @@ function representativePoint(coordinates) {
   const lon = pairs.reduce((sum, p) => sum + p[0], 0) / n;
   const lat = pairs.reduce((sum, p) => sum + p[1], 0) / n;
   return [lon, lat];
+}
+
+function DirectionRow({ label }) {
+  const [elevation, setElevation] = useState(0);
+  const [azimuth, setAzimuth] = useState(0);
+
+  return (
+    <>
+      <span className="grid-label">{label}</span>
+      <input
+        type="number"
+        min={-90}
+        max={90}
+        step={0.1}
+        value={elevation}
+        onChange={(e) => setElevation(e.target.value)}
+        aria-label={`${label} elevation`}
+      />
+      <input
+        type="number"
+        min={0}
+        max={360}
+        step={0.1}
+        value={azimuth}
+        onChange={(e) => setAzimuth(e.target.value)}
+        aria-label={`${label} azimuth`}
+      />
+    </>
+  );
+}
+
+export function DirectionGrid() {
+  return (
+    <div className="direction-grid">
+      <span />
+      <span className="grid-head">Elevation °</span>
+      <span className="grid-head">Azimuth °</span>
+      <DirectionRow label="☀️ Sun" />
+      <DirectionRow label="🌍 Earth" />
+    </div>
+  );
 }

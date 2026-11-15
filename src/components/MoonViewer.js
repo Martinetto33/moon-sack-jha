@@ -29,7 +29,6 @@ export default function MoonViewer() {
   const hostRef = useRef(null);
   const viewerRef = useRef(null);
   const cesiumRef = useRef(null);
-  const [status, setStatus] = useState("Initializing Cesium…");
   const [paused, setPaused] = useState(false);
   const [onSurface, setOnSurface] = useState(false);
   const [viewer, setViewer] = useState(null);
@@ -212,7 +211,6 @@ export default function MoonViewer() {
       // Start with the Sun, the Earth and the Moon in view.
       setViewer(viewer);
       flyToSystem(Cesium, viewer, 0);
-      setStatus(HELP);
     })().catch((err) => {
       console.error(err);
       setStatus("Failed to load Cesium. Check the console.");
@@ -252,14 +250,13 @@ export default function MoonViewer() {
   const goTo = (fly) => {
     withViewer(fly);
     setOnSurface(false);
-    setStatus(HELP);
   };
 
   const look = (getPosition, name) => {
     withViewer((Cesium, viewer) => {
       const time = viewer.clock.currentTime;
       const visible = lookAt(Cesium, viewer, getPosition(Cesium, time));
-      setStatus(visible ? HELP : `The ${name} is below the horizon from here.`);
+      setStatus(visible ? "" : `The ${name} is below the horizon from here.`);
     });
   };
   const loadSummaryForSite = async (longitude, latitude, siteName) => {
@@ -377,7 +374,7 @@ export default function MoonViewer() {
           <div className="moon">
             <h1>🌕 Moon</h1>
             <p className="small-subtext">
-              Drag to rotate, scroll to zoom, right-drag to tilt, double-click
+              Drag to rotate, scroll to zoom, shift+drag to pan, double-click
               the Moon to stand on it
             </p>
             <p>Real-time lunar position computed with Cesium.</p>
