@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "primereact/button";
+import SidePanel from "./SidePanel";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const MOON_RADIUS = 1737400; // meters
@@ -72,7 +73,8 @@ export default function MoonViewer() {
           tileMatrixSetID: "default028mm",
           tilingScheme: new Cesium.GeographicTilingScheme(),
           maximumLevel: 8,
-          credit: "LROC WAC mosaic: NASA/GSFC/Arizona State University, via NASA Moon Trek",
+          credit:
+            "LROC WAC mosaic: NASA/GSFC/Arizona State University, via NASA Moon Trek",
         }),
       );
 
@@ -89,7 +91,11 @@ export default function MoonViewer() {
       // for the Moon drawn around the globe when it would look too small.
       // Both are enlarged so they never look smaller than MIN_SCREEN_RADIUS.
       const earth = viewer.scene.primitives.add(
-        texturedSphere(Cesium, EARTH_RADIUS, `${BASE}/textures/earth-texture.jpg`),
+        texturedSphere(
+          Cesium,
+          EARTH_RADIUS,
+          `${BASE}/textures/earth-texture.jpg`,
+        ),
       );
       const moonStandIn = viewer.scene.primitives.add(
         texturedSphere(
@@ -146,7 +152,8 @@ export default function MoonViewer() {
       input.setInputAction((move) => {
         if (!dragFrom || !isStanding(viewer)) return;
         const camera = viewer.camera;
-        const radiansPerPixel = camera.frustum.fovy / viewer.canvas.clientHeight;
+        const radiansPerPixel =
+          camera.frustum.fovy / viewer.canvas.clientHeight;
         const maxPitch = Cesium.Math.toRadians(85);
         camera.setView({
           orientation: {
@@ -154,7 +161,8 @@ export default function MoonViewer() {
               camera.heading -
               (move.endPosition.x - dragFrom.x) * radiansPerPixel,
             pitch: Cesium.Math.clamp(
-              camera.pitch + (move.endPosition.y - dragFrom.y) * radiansPerPixel,
+              camera.pitch +
+                (move.endPosition.y - dragFrom.y) * radiansPerPixel,
               -maxPitch,
               maxPitch,
             ),
@@ -207,6 +215,7 @@ export default function MoonViewer() {
       <div ref={hostRef} className="cesium-host" />
 
       <div className="controls">
+        <SidePanel></SidePanel>
         <h1>🌕 Moon</h1>
         <p>Real-time lunar position computed with Cesium.</p>
 
@@ -385,7 +394,11 @@ function flyToSystem(Cesium, viewer, duration = 2) {
     Math.sin(azimuth) * Math.cos(down),
     -Math.sin(down),
   );
-  const right = Cartesian3.cross(direction, Cartesian3.UNIT_Z, new Cartesian3());
+  const right = Cartesian3.cross(
+    direction,
+    Cartesian3.UNIT_Z,
+    new Cartesian3(),
+  );
   const up = Cartesian3.normalize(
     Cartesian3.cross(right, direction, right),
     right,
