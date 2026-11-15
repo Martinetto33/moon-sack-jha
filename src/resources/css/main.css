@@ -27,7 +27,7 @@
   top: 16px;
   left: 16px;
   width: 280px;
-  height: calc(100vh - 32px);
+  height: 70%;
   max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
@@ -61,7 +61,6 @@
   flex: 0 0 auto;
   height: auto;
   margin-top: 12px;
-  padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 

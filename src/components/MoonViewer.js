@@ -399,25 +399,7 @@ export default function MoonViewer() {
               the Moon to stand on it
             </p>
             <div className="row">
-              <button onClick={togglePlay}>
-                {paused ? "▶ Play" : "⏸ Pause"}
-              </button>
-              <button
-                onClick={() =>
-                  withViewer(
-                    (C, v) => (v.clock.currentTime = C.JulianDate.now()),
-                  )
-                }
-              >
-                ⟲ Now
-              </button>
               <DatePicker viewer={viewer} />
-            </div>
-
-            <div className="row">
-              <button onClick={() => setSpeed(1)}>1×</button>
-              <button onClick={() => setSpeed(3600)}>1 h/s</button>
-              <button onClick={() => setSpeed(86400)}>1 d/s</button>
             </div>
           </div>
         </div>

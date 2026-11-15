@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Calendar } from 'primereact/calendar';
-import * as Cesium from 'cesium';
+import { useEffect, useState } from "react";
+import { Calendar } from "primereact/calendar";
+import * as Cesium from "cesium";
 
 export default function TimelineDatePicker({ viewer }) {
   const [date, setDate] = useState(new Date());
@@ -22,7 +22,7 @@ export default function TimelineDatePicker({ viewer }) {
       hourFormat="24"
       dateFormat="dd/mm/yy"
       showIcon
-      style={{position: "absolute", bottom: "2"}}
+      //inputStyle={{ display: "none" }}
     />
   );
 }
