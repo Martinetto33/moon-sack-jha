@@ -125,6 +125,11 @@ body {
   font-size: 16px;
 }
 
+.summary-drag-hint {
+  color: #aaa;
+  font-size: 11px;
+}
+
 .summary-toggle {
   display: grid;
   flex: 0 0 28px;

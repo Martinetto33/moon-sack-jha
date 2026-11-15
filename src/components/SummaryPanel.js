@@ -82,7 +82,12 @@ export default function SummaryPanel({ isRendered, summary }) {
         onPointerUp={stopDrag}
         onPointerCancel={stopDrag}
       >
-        <h2>Site summary</h2>
+        <div className="summary-title">
+          <h2>Site summary</h2>
+          {!isMinimized && (
+            <span className="summary-drag-hint">Drag header to move</span>
+          )}
+        </div>
         <button
           type="button"
           className="summary-toggle"
