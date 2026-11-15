@@ -1,0 +1,257 @@
+/* Cesium container fills the page */
+.cesium-host {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Overlay sits above the globe and ignores clicks except on controls */
+.overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  font-family: system-ui, sans-serif;
+  color: #e8e8f0;
+}
+
+.overlay button,
+.overlay input,
+.overlay label {
+  pointer-events: auto;
+}
+
+/* Left-hand control column */
+.controls {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 280px;
+  height: 70%;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* the inner scroll panel handles scrolling */
+  padding: 16px;
+  background: rgba(10, 12, 20, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+}
+.controls h1 {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
+}
+
+.controls p {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.landing {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.moon {
+  flex: 0 0 auto;
+  height: auto;
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.side-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Button rows */
+.row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.row > button {
+  flex: 1;
+}
+
+button {
+  padding: 6px 10px;
+  font: inherit;
+  color: #e8e8f0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* Bottom navigation */
+.nav {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.panel-header {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.title {
+  margin: 12px 0 4px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+/* Sliders */
+.slider {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.slider-value {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.slider input[type="range"] {
+  width: 100%;
+  accent-color: #7aa7ff;
+  cursor: pointer;
+}
+
+/* Landing site list */
+.scroll-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 8px;
+  padding-right: 4px;
+}
+
+.card {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.card-title {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+}
+
+.card p {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.add-button {
+  margin-top: 6px;
+  width: 100%;
+}
+
+.moon .small-subtext {
+  font-size: 0.7em;
+  color: grey;
+  margin: 0.2rem 0;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.icon-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Tooltip appears below the button, so it isn't clipped by the panel's top edge */
+.icon-button::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  transform: none;
+  white-space: nowrap;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  background: rgba(10, 12, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+
+.icon-button:hover::after {
+  opacity: 1;
+}
+
+.direction-grid {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 2px 4px;
+  align-items: center;
+  font-size: 0.8rem;
+  margin: 4px 0;
+}
+
+.grid-head {
+  opacity: 0.7;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.grid-label {
+  white-space: nowrap;
+}
+
+.direction-grid input[type="number"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  font: inherit;
+  color: #e8e8f0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+}

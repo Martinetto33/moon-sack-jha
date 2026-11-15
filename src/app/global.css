@@ -1,0 +1,310 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: system-ui, sans-serif;
+}
+
+.page {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.cesium-host {
+  position: absolute;
+  inset: 0;
+}
+
+.cesium-overlay-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+/* Panel on the left, navigation bar centred; stacked on narrow screens. */
+.overlay {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  pointer-events: none; /* the Moon stays draggable between the boxes */
+}
+
+.overlay > * {
+  pointer-events: auto;
+}
+
+@media (max-width: 900px) {
+  .overlay {
+    grid-template-columns: 1fr;
+  }
+
+  .nav {
+    order: -1;
+  }
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(10, 12, 20, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #e6e6e6;
+  backdrop-filter: blur(6px);
+}
+
+.controls {
+  justify-self: start;
+  display: flex;
+  flex-direction: column;
+  width: 20rem;
+  height: 100%;
+  color: #e6e6e6;
+  backdrop-filter: blur(6px);
+}
+
+.summary-overlay {
+  position: absolute;
+  bottom: 32px;
+  right: 16px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 32px));
+  padding: 12px;
+  max-height: min(55vh, calc(100vh - 48px));
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(10, 12, 20, 0.9);
+  color: #e6e6e6;
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.summary-overlay--minimized {
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 8px 10px;
+}
+
+.summary-overlay--minimized .summary-header {
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.summary-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.summary-header:active {
+  cursor: grabbing;
+}
+
+.summary-header h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.summary-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.summary-drag-hint {
+  color: #aaa;
+  font-size: 11px;
+}
+
+.summary-message {
+  margin: 4px 0 0;
+  color: #ccc;
+  font-size: 13px;
+}
+
+.summary-message--loading {
+  color: #ddd;
+}
+
+.summary-message--error {
+  color: #ff9a9a;
+}
+
+.summary-toggle {
+  display: grid;
+  flex: 0 0 28px;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+}
+
+.summary-toggle:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.summary-toggle:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.summary-overview {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  color: #ccc;
+  font-size: 12px;
+}
+
+.summary-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.summary-target {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(5, 7, 13, 0.96);
+  overflow: auto;
+}
+
+.summary-target h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.summary-target dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.summary-target dl > div {
+  min-width: 0;
+}
+
+.summary-target dt {
+  color: #bbb;
+}
+
+.summary-target dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.summary-target .summary-window dd {
+  font-size: 11px;
+}
+
+.controls h1 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.controls p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.75;
+}
+
+.controls button:not(.p-button),
+.nav button:not(.p-button) {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.controls button:not(.p-button):hover,
+.nav button:not(.p-button):hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.controls .row {
+  display: flex;
+  gap: 6px;
+}
+
+.controls .row button:not(.p-button) {
+  flex: 1;
+  text-align: center;
+}
+
+.status {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ccc;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 12px;
+  border-radius: 6px;
+  z-index: 10;
+}
+
+@media (max-width: 900px) {
+  .summary-overlay {
+    top: auto;
+    right: 12px;
+    bottom: 52px;
+    width: calc(100vw - 24px);
+    max-height: min(55vh, calc(100vh - 64px));
+  }
+
+  .summary-overlay--minimized {
+    width: max-content;
+    max-width: calc(100vw - 24px);
+  }
+}
+
+@media (max-width: 520px) {
+  .summary-content {
+    grid-template-columns: 1fr;
+  }
+}

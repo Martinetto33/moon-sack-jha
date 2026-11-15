@@ -1,0 +1,206 @@
+import React, { useEffect, useRef, useState } from "react";
+import { parseLandingSites } from "./landingSites";
+
+// File in public/resources/ caricati automaticamente all'avvio
+const BASE_FILES = ["/sites/landing-sites-A3.geojson"];
+
+export default function SidePanel({
+  simulationSites,
+  setSimulationSites,
+  wantedTargets,
+  onWantedTargetsChange,
+  onFocusSite,
+}) {
+  // Every site from the loaded GeoJSON files.
+  const [landingSites, setLandingSites] = useState([]);
+  const fileInputRef = useRef(null);
+
+  // Caricamento automatico dei file base allo start
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadBaseFiles = async () => {
+      const loaded = [];
+      for (const path of BASE_FILES) {
+        try {
+          const res = await fetch(path);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const name = path.split("/").pop();
+          loaded.push(...parseLandingSites(await res.text(), name));
+        } catch (err) {
+          throw err;
+        }
+      }
+      if (!cancelled) setLandingSites(loaded);
+    };
+
+    loadBaseFiles();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const addLandingSites = async (event) => {
+    const files = [...event.target.files];
+    event.target.value = ""; // so the same file can be picked again
+    for (const file of files) {
+      try {
+        const sites = parseLandingSites(await file.text(), file.name);
+        // Adding a file again replaces its sites.
+        setLandingSites((current) => [
+          ...current.filter((site) => site.source !== file.name),
+          ...sites,
+        ]);
+      } catch (err) {
+        throw err;
+      }
+    }
+  };
+
+  const addSiteToViewer = (site) => {
+    if (simulationSites.some((s) => s.id === site.id)) {
+      return;
+    }
+    setSimulationSites((current) => [...current, site]);
+  };
+
+  const focusSite = (site) => {
+    const [lon, lat] = representativePoint(site.geometry.coordinates);
+    onFocusSite(lon, lat, site.name);
+  };
+
+  return (
+    <div className="side-panel">
+      <div className="panel-heading">
+        <h2 className="panel-header">Landing Sites</h2>
+        <button
+          className="icon-button"
+          data-tooltip="Add custom landing site"
+          aria-label="Add custom landing site"
+          onClick={() => fileInputRef.current.click()}
+        >
+          +
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".geojson,.json,application/geo+json,application/json"
+          multiple
+          hidden
+          onChange={addLandingSites}
+        />
+      </div>
+      <DirectionGrid
+        wantedTargets={wantedTargets}
+        onWantedTargetsChange={onWantedTargetsChange}
+      />
+
+      <div
+        className="scroll-panel"
+        style={{ width: "100%", height: "100%", overflowY: "auto" }}
+      >
+        {landingSites.map((site) => {
+          const [lon, lat] = representativePoint(site.geometry.coordinates);
+          return (
+            <div className="card" key={site.id}>
+              <h3 className="card-title">{site.name}</h3>
+              <p className="m-0">{site.geometry.type}</p>
+              <p className="m-0">
+                {lat.toFixed(3)} - {lon.toFixed(3)}
+              </p>
+              <p className="m-0">
+                {site.properties.desc ?? site.properties.description ?? ""}
+              </p>
+              <button
+                className="add-button"
+                onClick={() => {
+                  addSiteToViewer(site);
+                  focusSite(site);
+                }}
+              >
+                + Add to simulation
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Restituisce un punto rappresentativo [lon, lat] della geometria
+ * (per un Point è il punto stesso, per Polygon/LineString è la media dei vertici).
+ */
+function representativePoint(coordinates) {
+  const pairs = [];
+  const walk = (c) => {
+    if (typeof c[0] === "number") pairs.push(c);
+    else c.forEach(walk);
+  };
+  walk(coordinates);
+  const n = pairs.length;
+  const lon = pairs.reduce((sum, p) => sum + p[0], 0) / n;
+  const lat = pairs.reduce((sum, p) => sum + p[1], 0) / n;
+  return [lon, lat];
+}
+
+function DirectionRow({ label, target, onChange }) {
+  return (
+    <>
+      <span className="grid-label">{label}</span>
+      <input
+        type="number"
+        min={-90}
+        max={90}
+        step={0.1}
+        value={target.elevation}
+        onChange={(e) =>
+          onChange(
+            "elevation",
+            e.target.value === "" ? "" : Number(e.target.value),
+          )
+        }
+        aria-label={`${label} elevation`}
+      />
+      <input
+        type="number"
+        min={0}
+        max={360}
+        step={0.1}
+        value={target.azimuth}
+        onChange={(e) =>
+          onChange("azimuth", e.target.value === "" ? "" : Number(e.target.value))
+        }
+        aria-label={`${label} azimuth`}
+      />
+    </>
+  );
+}
+
+export function DirectionGrid({ wantedTargets, onWantedTargetsChange }) {
+  const updateTarget = (name, field, value) => {
+    onWantedTargetsChange((current) => ({
+      ...current,
+      [name]: { ...current[name], [field]: value },
+    }));
+  };
+
+  return (
+    <div className="direction-grid">
+      <span />
+      <span className="grid-head">Elevation °</span>
+      <span className="grid-head">Azimuth °</span>
+      <DirectionRow
+        label="☀️ Sun"
+        target={wantedTargets.sun}
+        onChange={(field, value) => updateTarget("sun", field, value)}
+      />
+      <DirectionRow
+        label="🌍 Earth"
+        target={wantedTargets.earth}
+        onChange={(field, value) => updateTarget("earth", field, value)}
+      />
+    </div>
+  );
+}
