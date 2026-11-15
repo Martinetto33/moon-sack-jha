@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "primereact/button";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const MOON_RADIUS = 1737400; // meters
@@ -215,6 +216,28 @@ export default function MoonViewer() {
         <button onClick={() => withViewer((C, v) => flyToMoon(C, v))}>
           🌕 Moon close-up
         </button>
+        {/* Example PrimeReact Button */}
+        {/* <Button
+          label="Random location"
+          icon="pi pi-map-marker"
+          onClick={() =>
+            withViewer((C, v) => {
+              const longitude = Math.random() * 360 - 180;
+              const latitude =
+                (Math.asin(Math.random() * 2 - 1) * 180) / Math.PI;
+              standOn(
+                C,
+                v,
+                C.Cartesian3.fromDegrees(
+                  longitude,
+                  latitude,
+                  0,
+                  C.Ellipsoid.MOON,
+                ),
+              );
+            })
+          }
+        /> */}
 
         <div className="row">
           <button onClick={togglePlay}>{paused ? "▶ Play" : "⏸ Pause"}</button>

@@ -46,7 +46,7 @@ body {
   opacity: 0.75;
 }
 
-.controls button {
+.controls button:not(.p-button) {
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
@@ -57,7 +57,7 @@ body {
   cursor: pointer;
 }
 
-.controls button:hover {
+.controls button:not(.p-button):hover {
   background: rgba(255, 255, 255, 0.14);
 }
 
@@ -66,7 +66,7 @@ body {
   gap: 6px;
 }
 
-.controls .row button {
+.controls .row button:not(.p-button) {
   flex: 1;
   text-align: center;
 }
