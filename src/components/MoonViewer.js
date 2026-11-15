@@ -233,39 +233,43 @@ export default function MoonViewer() {
     <>
       <div ref={hostRef} className="cesium-host" />
 
-      <div className="controls">
-        <h1>🌕 Moon</h1>
-        <p>Real-time lunar position computed with Cesium.</p>
+      <div className="overlay">
+        <div className="controls">
+          <h1>🌕 Moon</h1>
+          <p>Real-time lunar position computed with Cesium.</p>
 
-        <button onClick={() => goTo(flyToSystem)}>☀️ Sun, Earth &amp; Moon</button>
-        <button onClick={() => goTo(flyToMoon)}>🌕 Moon close-up</button>
-        {onSurface && (
-          <>
-            <button onClick={() => look(getEarthPosition, "Earth")}>
-              🌍 Look at Earth
+          <div className="row">
+            <button onClick={togglePlay}>{paused ? "▶ Play" : "⏸ Pause"}</button>
+            <button
+              onClick={() =>
+                withViewer((C, v) => (v.clock.currentTime = C.JulianDate.now()))
+              }
+            >
+              ⟲ Now
             </button>
-            <button onClick={() => look(getSunPosition, "Sun")}>
-              ☀️ Look at Sun
-            </button>
-          </>
-        )}
+          </div>
 
-        <div className="row">
-          <button onClick={togglePlay}>{paused ? "▶ Play" : "⏸ Pause"}</button>
-          <button
-            onClick={() =>
-              withViewer((C, v) => (v.clock.currentTime = C.JulianDate.now()))
-            }
-          >
-            ⟲ Now
-          </button>
+          <div className="row">
+            <button onClick={() => setSpeed(1)}>1×</button>
+            <button onClick={() => setSpeed(3600)}>1 h/s</button>
+            <button onClick={() => setSpeed(86400)}>1 d/s</button>
+          </div>
         </div>
 
-        <div className="row">
-          <button onClick={() => setSpeed(1)}>1×</button>
-          <button onClick={() => setSpeed(3600)}>1 h/s</button>
-          <button onClick={() => setSpeed(86400)}>1 d/s</button>
-        </div>
+        <nav className="nav">
+          <button onClick={() => goTo(flyToSystem)}>☀️ Sun, Earth &amp; Moon</button>
+          <button onClick={() => goTo(flyToMoon)}>🌕 Moon close-up</button>
+          {onSurface && (
+            <>
+              <button onClick={() => look(getEarthPosition, "Earth")}>
+                🌍 Look at Earth
+              </button>
+              <button onClick={() => look(getSunPosition, "Sun")}>
+                ☀️ Look at Sun
+              </button>
+            </>
+          )}
+        </nav>
       </div>
 
       <div className="status">{status}</div>
